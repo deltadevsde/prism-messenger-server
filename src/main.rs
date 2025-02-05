@@ -1,5 +1,8 @@
 mod account;
 mod common;
+mod database;
+mod keys;
+mod messages;
 mod registration;
 mod state;
 mod webserver;
