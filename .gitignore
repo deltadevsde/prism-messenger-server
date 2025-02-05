@@ -1,0 +1,12 @@
+# Cargo
+debug/
+target/
+
+# rustfmt
+**/*.rs.bk
+
+# MSVC Windows rustc
+*.pdb
+
+# IDEs
+.idea/

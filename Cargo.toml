@@ -1,0 +1,38 @@
+[package]
+name = "prism-messenger-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Webserver
+tokio = { version = "1.16.1", features = ["full"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors"] }
+
+# OAS Documentation
+utoipa = { version = "5.3", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+utoipa-axum = { version = "0.2.0" }
+
+# Prism
+prism-prover = { path = "../prism/crates/node_types/prover", features = [
+    "mock_prover",
+] }
+prism-common = { path = "../prism/crates/common" }
+prism-keys = { path = "../prism/crates/keys" }
+prism-storage = { path = "../prism/crates/storage" }
+prism-da = { path = "../prism/crates/da" }
+keystore-rs = { version = "0.3" }
+
+# Errors
+anyhow = "1.0.95"
+
+# Logging
+log = "0.4.7"
+pretty_env_logger = "0.5.0"
+
+# Serialization/Deserialization
+serde = { version = "1.0.151", features = ["derive"] }
+
+# Testing
+mockall = "0.13.1"
