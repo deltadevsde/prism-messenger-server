@@ -2,36 +2,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use prism_common::account::Account;
-use prism_keys::{Signature, VerifyingKey};
 use prism_tree::proofs::HashedMerkleProof;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{common::prism_client::PrismClient, database::Database};
+use crate::common::prism_client::PrismClient;
 
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
-pub struct Prekey {
-    pub key_idx: u32,
-    pub key: VerifyingKey,
-}
-
-/// The complete key bundle contains the long-term identity key,
-/// the signed pre-key (with its signature), and a list of one-time pre-keys.
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
-pub struct KeyBundle {
-    pub identity_key: VerifyingKey,
-    pub signed_prekey: VerifyingKey,
-    pub signed_prekey_signature: Signature,
-    pub prekeys: Vec<Prekey>,
-}
-
-impl KeyBundle {
-    pub fn verify(&self) {
-        // Ensure signature is signed_prekey signed by identity_key
-        // Ensure prekeys have no duplicate IDs
-        todo!()
-    }
-}
+use super::{
+    database::KeyDatabase,
+    entities::{KeyBundle, Prekey},
+};
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct KeyBundleResponse {
@@ -43,7 +23,7 @@ pub struct KeyBundleResponse {
 pub struct KeyService<C, D>
 where
     C: PrismClient,
-    D: Database,
+    D: KeyDatabase,
 {
     client: Arc<C>,
     db: Arc<D>,
@@ -52,7 +32,7 @@ where
 impl<C, D> KeyService<C, D>
 where
     C: PrismClient,
-    D: Database,
+    D: KeyDatabase,
 {
     pub fn new(client: Arc<C>, db: Arc<D>) -> Self {
         Self { client, db }

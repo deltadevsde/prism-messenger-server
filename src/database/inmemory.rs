@@ -2,9 +2,13 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use super::Database;
-use crate::keys::service::{KeyBundle, Prekey};
+use crate::keys::{
+    database::KeyDatabase,
+    entities::{KeyBundle, Prekey},
+};
 use crate::messages::service::Message;
+
+use super::Database;
 
 pub struct InMemoryDatabase {
     pub key_bundles: Mutex<HashMap<String, KeyBundle>>,
@@ -20,7 +24,7 @@ impl InMemoryDatabase {
     }
 }
 
-impl Database for InMemoryDatabase {
+impl KeyDatabase for InMemoryDatabase {
     fn insert_keybundle(&self, user: String, key_bundle: KeyBundle) -> Result<bool> {
         let mut kb_lock = self
             .key_bundles
@@ -53,7 +57,9 @@ impl Database for InMemoryDatabase {
             Err(anyhow!("Key bundle not found for user: {}", user))
         }
     }
+}
 
+impl Database for InMemoryDatabase {
     fn insert_message(&self, message: Message) -> Result<bool> {
         let user = message.recipient_id.clone();
         let mut messages_lock = self

@@ -11,7 +11,10 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::state::AppState;
 
-use super::service::{KeyBundle, KeyBundleResponse, Prekey};
+use super::{
+    entities::{KeyBundle, Prekey},
+    service::KeyBundleResponse,
+};
 
 const KEY_TAG: &str = "keys";
 
