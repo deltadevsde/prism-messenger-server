@@ -2,13 +2,14 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::keys::{
-    database::KeyDatabase,
-    entities::{KeyBundle, Prekey},
-};
 use crate::messages::service::Message;
-
-use super::Database;
+use crate::{
+    keys::{
+        database::KeyDatabase,
+        entities::{KeyBundle, Prekey},
+    },
+    messages::database::MessageDatabase,
+};
 
 pub struct InMemoryDatabase {
     pub key_bundles: Mutex<HashMap<String, KeyBundle>>,
@@ -59,7 +60,7 @@ impl KeyDatabase for InMemoryDatabase {
     }
 }
 
-impl Database for InMemoryDatabase {
+impl MessageDatabase for InMemoryDatabase {
     fn insert_message(&self, message: Message) -> Result<bool> {
         let user = message.recipient_id.clone();
         let mut messages_lock = self
