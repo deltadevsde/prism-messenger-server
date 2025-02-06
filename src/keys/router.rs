@@ -36,7 +36,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
 
 #[utoipa::path(
     post,
-    path = "/keys/upload_bundle",
+    path = "/upload_bundle",
     request_body = UploadKeyBundleRequest,
     responses(
         (status = 200, description = "Bundle upload successful"),
@@ -58,7 +58,7 @@ async fn post_keybundle(
 
 #[utoipa::path(
     post,
-    path = "/keys/upload_prekeys",
+    path = "/upload_prekeys",
     request_body = UploadPrekeysRequest,
     responses(
         (status = 200, description = "Prekey upload successful"),
@@ -80,7 +80,7 @@ async fn post_prekeys(
 
 #[utoipa::path(
     get,
-    path = "/keys/bundle/{user_id}",
+    path = "/bundle/{user_id}",
     params(
         ("user_id" = String, Path, description = "User identifier")
     ),

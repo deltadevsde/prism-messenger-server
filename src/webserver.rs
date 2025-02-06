@@ -1,3 +1,4 @@
+use crate::{account, keys, registration, state::AppState};
 use anyhow::{Context, Result};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -10,11 +11,6 @@ use utoipa::{
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
-
-use crate::state::AppState;
-
-use super::account;
-use super::registration;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebServerConfig {
@@ -37,6 +33,7 @@ struct ApiDoc;
 pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/accounts", account::router())
+        .nest("/keys", keys::router())
         .merge(registration::router())
         .with_state(Arc::new(state))
         .layer(CorsLayer::permissive())

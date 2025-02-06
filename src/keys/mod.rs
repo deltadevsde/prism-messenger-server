@@ -1,2 +1,4 @@
-pub mod router;
+mod router;
 pub mod service;
+
+pub use router::router;
