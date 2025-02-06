@@ -45,7 +45,7 @@ where
     C: PrismClient,
     D: Database,
 {
-    prover: Arc<C>,
+    client: Arc<C>,
     db: Arc<D>,
 }
 
@@ -54,8 +54,8 @@ where
     C: PrismClient,
     D: Database,
 {
-    pub fn new(prover: Arc<C>, db: Arc<D>) -> Self {
-        Self { prover, db }
+    pub fn new(client: Arc<C>, db: Arc<D>) -> Self {
+        Self { client, db }
     }
 
     pub fn upload_key_bundle(&self, user_id: &str, bundle: KeyBundle) -> Result<bool> {
@@ -73,7 +73,7 @@ where
 
     pub async fn get_keybundle(&self, user_id: &str) -> Result<KeyBundleResponse> {
         let keybundle = self.db.get_keybundle(user_id.to_string())?;
-        let account_response = self.prover.get_account(user_id).await?;
+        let account_response = self.client.get_account(user_id).await?;
 
         let response = KeyBundleResponse {
             key_bundle: keybundle,
