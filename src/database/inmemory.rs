@@ -2,13 +2,12 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::messages::service::Message;
 use crate::{
     keys::{
         database::KeyDatabase,
         entities::{KeyBundle, Prekey},
     },
-    messages::database::MessageDatabase,
+    messages::{database::MessageDatabase, entities::Message},
 };
 
 pub struct InMemoryDatabase {

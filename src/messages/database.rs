@@ -1,6 +1,7 @@
-use super::service::Message;
 use anyhow::Result;
 use uuid::Uuid;
+
+use super::entities::Message;
 
 pub trait MessageDatabase {
     fn insert_message(&self, message: Message) -> Result<bool>;
