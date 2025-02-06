@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use prism_common::account::Account;
 use prism_keys::{Signature, VerifyingKey};
 use prism_prover::{prover::AccountResponse, Prover};
@@ -8,7 +8,7 @@ use prism_tree::proofs::HashedMerkleProof;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::database::{inmemory::InMemoryDatabase, Database};
+use crate::{common::prism_client::PrismClient, database::Database};
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct Prekey {
@@ -41,13 +41,21 @@ pub struct KeyBundleResponse {
     pub proof: HashedMerkleProof,
 }
 
-pub struct KeyService {
-    prover: Arc<Prover>,
-    db: Arc<InMemoryDatabase>,
+pub struct KeyService<C, D>
+where
+    C: PrismClient,
+    D: Database,
+{
+    prover: Arc<C>,
+    db: Arc<D>,
 }
 
-impl KeyService {
-    pub fn new(prover: Arc<Prover>, db: Arc<InMemoryDatabase>) -> Self {
+impl<C, D> KeyService<C, D>
+where
+    C: PrismClient,
+    D: Database,
+{
+    pub fn new(prover: Arc<C>, db: Arc<D>) -> Self {
         Self { prover, db }
     }
 

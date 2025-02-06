@@ -11,14 +11,15 @@ use crate::{
 
 pub struct AppState {
     pub account_service: AccountService<Prover>,
-    pub key_service: KeyService,
-    pub messaging_service: MessagingService,
+    pub key_service: KeyService<Prover, InMemoryDatabase>,
+    pub messaging_service: MessagingService<InMemoryDatabase>,
     pub registration_service: RegistrationService<Prover>,
 }
 
 impl AppState {
     pub fn new(prover: Arc<Prover>, signing_key: SigningKey) -> Self {
         let db = Arc::new(InMemoryDatabase::new());
+
         let account_service = AccountService::new(prover.clone());
         let registration_service = RegistrationService::new(prover.clone(), signing_key);
         let key_service = KeyService::new(prover.clone(), db.clone());

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use prism_keys::VerifyingKey;
 
-use crate::database::{inmemory::InMemoryDatabase, Database};
+use crate::database::Database;
 
 /// The header provides the recipient with the context needed to update
 /// its ratchet state. It includes the sender’s ephemeral public key and
@@ -54,12 +54,12 @@ pub struct Message {
     pub timestamp: u64,
 }
 
-pub struct MessagingService {
-    db: Arc<InMemoryDatabase>,
+pub struct MessagingService<D: Database> {
+    db: Arc<D>,
 }
 
-impl MessagingService {
-    pub fn new(db: Arc<InMemoryDatabase>) -> MessagingService {
+impl<D: Database> MessagingService<D> {
+    pub fn new(db: Arc<D>) -> MessagingService<D> {
         MessagingService { db }
     }
 
