@@ -6,7 +6,7 @@ use prism_prover::Prover;
 use crate::{account::service::AccountService, registration::service::RegistrationService};
 
 pub struct AppState {
-    pub account_service: AccountService,
+    pub account_service: AccountService<Prover>,
     pub registration_service: RegistrationService<Prover>,
 }
 
