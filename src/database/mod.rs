@@ -1,4 +1,4 @@
-mod inmemory;
+pub mod inmemory;
 use anyhow::Result;
 
 use crate::{

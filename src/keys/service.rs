@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use prism_common::account::Account;
 use prism_keys::{Signature, VerifyingKey};
 use prism_prover::{prover::AccountResponse, Prover};
+use prism_tree::proofs::HashedMerkleProof;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-use crate::database::Database;
+use crate::database::{inmemory::InMemoryDatabase, Database};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct Prekey {
     pub key_idx: u32,
     pub key: VerifyingKey,
@@ -14,7 +18,7 @@ pub struct Prekey {
 
 /// The complete key bundle contains the long-term identity key,
 /// the signed pre-key (with its signature), and a list of one-time pre-keys.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct KeyBundle {
     pub identity_key: VerifyingKey,
     pub signed_prekey: VerifyingKey,
@@ -30,18 +34,20 @@ impl KeyBundle {
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct KeyBundleResponse {
-    pub key_bundle: KeyBundle,
-    pub account: AccountResponse,
+    pub key_bundle: Option<KeyBundle>,
+    pub account: Option<Account>,
+    pub proof: HashedMerkleProof,
 }
 
 pub struct KeyService {
     prover: Arc<Prover>,
-    db: Arc<dyn Database>,
+    db: Arc<InMemoryDatabase>,
 }
 
 impl KeyService {
-    pub fn new(prover: Arc<Prover>, db: Arc<dyn Database>) -> Self {
+    pub fn new(prover: Arc<Prover>, db: Arc<InMemoryDatabase>) -> Self {
         Self { prover, db }
     }
 
@@ -60,15 +66,22 @@ impl KeyService {
 
     pub async fn get_keybundle(&self, user_id: &str) -> Result<KeyBundleResponse> {
         let keybundle = self.db.get_keybundle(user_id.to_string())?;
+        let account_response = self.prover.get_account(user_id).await?;
+        let (account, proof) = match account_response {
+            AccountResponse::Found(account, proof) => (Some(*account), proof.hashed()),
+            AccountResponse::NotFound(proof) => (None, proof.hashed()),
+        };
         match keybundle {
-            Some(bundle) => {
-                let account = self.prover.get_account(user_id).await?;
-                Ok(KeyBundleResponse {
-                    key_bundle: bundle,
-                    account,
-                })
-            }
-            None => Err(anyhow!("Key bundle not found")),
+            Some(bundle) => Ok(KeyBundleResponse {
+                key_bundle: Some(bundle),
+                account,
+                proof,
+            }),
+            None => Ok(KeyBundleResponse {
+                key_bundle: None,
+                account,
+                proof,
+            }),
         }
     }
 }
