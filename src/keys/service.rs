@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use prism_common::account::Account;
 use prism_keys::{Signature, VerifyingKey};
-use prism_prover::{prover::AccountResponse, Prover};
 use prism_tree::proofs::HashedMerkleProof;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -75,21 +74,12 @@ where
     pub async fn get_keybundle(&self, user_id: &str) -> Result<KeyBundleResponse> {
         let keybundle = self.db.get_keybundle(user_id.to_string())?;
         let account_response = self.prover.get_account(user_id).await?;
-        let (account, proof) = match account_response {
-            AccountResponse::Found(account, proof) => (Some(*account), proof.hashed()),
-            AccountResponse::NotFound(proof) => (None, proof.hashed()),
+
+        let response = KeyBundleResponse {
+            key_bundle: keybundle,
+            account: account_response.account,
+            proof: account_response.proof,
         };
-        match keybundle {
-            Some(bundle) => Ok(KeyBundleResponse {
-                key_bundle: Some(bundle),
-                account,
-                proof,
-            }),
-            None => Ok(KeyBundleResponse {
-                key_bundle: None,
-                account,
-                proof,
-            }),
-        }
+        Ok(response)
     }
 }
