@@ -5,8 +5,10 @@ mod state;
 mod webserver;
 
 use anyhow::{anyhow, Result};
+use common::prism_client::PrismClient as _;
 use keystore_rs::{KeyChain, KeyStore};
 use log::debug;
+use prism_common::operation::ServiceChallenge;
 use prism_da::{memory::InMemoryDataAvailabilityLayer, DataAvailabilityLayer};
 use prism_keys::SigningKey;
 use prism_storage::inmemory::InMemoryDatabase;
@@ -63,7 +65,7 @@ async fn main() -> Result<()> {
         port: 48080,
     };
 
-    let app_state = AppState::new(prover.clone(), sk);
+    let app_state = AppState::new(prover.clone(), sk.clone());
 
     let webserver_task_handle = spawn(async move {
         debug!("starting webserver");
@@ -80,6 +82,8 @@ async fn main() -> Result<()> {
         }
     });
 
+    register_messenger_service(prover, &sk).await?;
+
     tokio::select! {
         _ = prover_task_handle => {
             println!("Prover runner task completed")
@@ -90,4 +94,15 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn register_messenger_service(prover: Arc<Prover>, signing_key: &SigningKey) -> Result<()> {
+    prover
+        .register_service(
+            PRISM_MESSENGER_SERVICE_ID.to_string(),
+            ServiceChallenge::Signed(signing_key.verifying_key()),
+            signing_key.verifying_key(),
+            signing_key,
+        )
+        .await
 }

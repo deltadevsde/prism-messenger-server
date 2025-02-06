@@ -2,7 +2,7 @@ use anyhow::Result;
 use mockall::automock;
 use prism_common::{
     account::Account,
-    operation::{Operation, ServiceChallengeInput},
+    operation::{Operation, ServiceChallenge, ServiceChallengeInput},
 };
 use prism_keys::{SigningKey, VerifyingKey};
 use prism_prover::{prover::AccountResponse::*, Prover};
@@ -15,6 +15,14 @@ pub struct AccountResponse {
 
 #[cfg_attr(test, automock)]
 pub trait PrismClient {
+    async fn register_service(
+        &self,
+        id: String,
+        challenge: ServiceChallenge,
+        key: VerifyingKey,
+        signing_key: &SigningKey,
+    ) -> Result<()>;
+
     async fn create_account(
         &self,
         username: String,
@@ -28,6 +36,23 @@ pub trait PrismClient {
 }
 
 impl PrismClient for Prover {
+    async fn register_service(
+        &self,
+        id: String,
+        challenge: ServiceChallenge,
+        key: VerifyingKey,
+        signing_key: &SigningKey,
+    ) -> Result<()> {
+        let op = Operation::RegisterService {
+            id: id.to_string(),
+            creation_gate: challenge,
+            key,
+        };
+
+        let tx = Account::default().prepare_transaction(id, op, signing_key)?;
+        self.validate_and_queue_update(tx).await
+    }
+
     async fn create_account(
         &self,
         id: String,
