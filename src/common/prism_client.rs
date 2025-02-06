@@ -5,7 +5,13 @@ use prism_common::{
     operation::{Operation, ServiceChallengeInput},
 };
 use prism_keys::{SigningKey, VerifyingKey};
-use prism_prover::Prover;
+use prism_prover::{prover::AccountResponse::*, Prover};
+use prism_tree::proofs::HashedMerkleProof;
+
+pub struct AccountResponse {
+    pub account: Option<Account>,
+    pub proof: HashedMerkleProof,
+}
 
 #[cfg_attr(test, automock)]
 pub trait PrismClient {
@@ -17,6 +23,8 @@ pub trait PrismClient {
         key: VerifyingKey,
         signing_key: &SigningKey,
     ) -> Result<()>;
+
+    async fn get_account(&self, username: &str) -> Result<AccountResponse>;
 }
 
 impl PrismClient for Prover {
@@ -37,5 +45,22 @@ impl PrismClient for Prover {
 
         let tx = Account::default().prepare_transaction(id, op, signing_key)?;
         self.validate_and_queue_update(tx).await
+    }
+
+    async fn get_account(&self, username: &str) -> Result<AccountResponse> {
+        let prism_account_res = Prover::get_account(self, username).await?;
+
+        let account_res = match prism_account_res {
+            Found(account, merkle_proof) => AccountResponse {
+                account: Some(*account),
+                proof: merkle_proof.hashed(),
+            },
+            NotFound(merkle_proof) => AccountResponse {
+                account: None,
+                proof: merkle_proof.hashed(),
+            },
+        };
+
+        Ok(account_res)
     }
 }
