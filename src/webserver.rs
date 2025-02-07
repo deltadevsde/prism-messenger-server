@@ -1,4 +1,4 @@
-use crate::{account, keys, registration, state::AppState};
+use crate::{account, keys, messages, registration, state::AppState};
 use anyhow::{Context, Result};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -34,6 +34,7 @@ pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/accounts", account::router())
         .nest("/keys", keys::router())
+        .nest("/messages", messages::router())
         .merge(registration::router())
         .with_state(Arc::new(state))
         .layer(CorsLayer::permissive())
