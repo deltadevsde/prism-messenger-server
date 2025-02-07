@@ -14,13 +14,12 @@ use log::debug;
 use prism_common::operation::ServiceChallenge;
 use prism_da::{memory::InMemoryDataAvailabilityLayer, DataAvailabilityLayer};
 use prism_keys::SigningKey;
+use prism_prover::{webserver::WebServerConfig as PrismWebServerConfig, Config, Prover};
 use prism_storage::inmemory::InMemoryDatabase;
 use state::AppState;
 use std::sync::Arc;
 use tokio::spawn;
 use webserver::WebServerConfig;
-
-use prism_prover::{webserver::WebServerConfig as PrismWebServerConfig, Config, Prover};
 
 pub static PRISM_MESSENGER_SERVICE_ID: &str = "prism_messenger";
 

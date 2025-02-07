@@ -9,12 +9,11 @@ use std::sync::Arc;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::state::AppState;
-
 use super::{
     entities::{KeyBundle, Prekey},
     service::KeyBundleResponse,
 };
+use crate::state::AppState;
 
 const KEY_TAG: &str = "keys";
 

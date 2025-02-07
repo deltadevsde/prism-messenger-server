@@ -7,12 +7,11 @@ use axum::{
 use std::sync::Arc;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+use super::entities::{MarkDeliveredRequest, SendMessageRequest};
 use crate::{
     messages::entities::{Message, SendMessageResponse},
     state::AppState,
 };
-
-use super::entities::{MarkDeliveredRequest, SendMessageRequest};
 
 const MESSAGING_TAG: &str = "messaging";
 

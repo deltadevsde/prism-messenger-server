@@ -1,5 +1,6 @@
-use super::entities::{KeyBundle, Prekey};
 use anyhow::Result;
+
+use super::entities::{KeyBundle, Prekey};
 
 pub trait KeyDatabase {
     fn insert_keybundle(&self, user: String, key_bundle: KeyBundle) -> Result<bool>;

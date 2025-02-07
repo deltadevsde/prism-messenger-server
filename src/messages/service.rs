@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::{anyhow, Result};
+use std::sync::Arc;
 
 use super::{
     database::MessageDatabase,

@@ -1,4 +1,3 @@
-use crate::{account, keys, messages, registration, state::AppState};
 use anyhow::{Context, Result};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -11,6 +10,8 @@ use utoipa::{
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
+
+use crate::{account, keys, messages, registration, state::AppState};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebServerConfig {

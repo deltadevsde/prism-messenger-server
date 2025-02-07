@@ -1,9 +1,8 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use prism_common::account::Account;
 use prism_tree::proofs::HashedMerkleProof;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use utoipa::ToSchema;
 
 use crate::common::prism_client::PrismClient;
