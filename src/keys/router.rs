@@ -53,7 +53,7 @@ async fn post_keybundle(
     state
         .key_service
         .upload_key_bundle(&req.user_id, req.keybundle)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(())
 }
@@ -75,7 +75,7 @@ async fn post_prekeys(
     state
         .key_service
         .add_prekeys(&req.user_id, req.prekeys)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(())
 }
