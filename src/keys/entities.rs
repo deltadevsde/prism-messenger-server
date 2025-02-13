@@ -1,10 +1,11 @@
+use anyhow::{anyhow, Result};
 use prism_keys::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct Prekey {
-    pub key_idx: u32,
+    pub key_idx: u64,
     pub key: VerifyingKey,
 }
 
@@ -19,9 +20,23 @@ pub struct KeyBundle {
 }
 
 impl KeyBundle {
-    pub fn verify(&self) {
+    pub fn verify(&self) -> Result<()> {
         // Ensure signature is signed_prekey signed by identity_key
+        let msg = self.identity_key.to_der()?;
+        self.identity_key
+            .verify_signature(&msg, &self.signed_prekey_signature)?;
         // Ensure prekeys have no duplicate IDs
-        todo!()
+        for prekey in &self.prekeys {
+            if self
+                .prekeys
+                .iter()
+                .filter(|k| k.key_idx == prekey.key_idx)
+                .count()
+                > 1
+            {
+                return Err(anyhow!("Duplicate prekey ID"));
+            }
+        }
+        Ok(())
     }
 }
