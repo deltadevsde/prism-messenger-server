@@ -11,10 +11,7 @@ use utoipa::{
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::state::AppState;
-
-use super::account;
-use super::registration;
+use crate::{account, keys, messages, registration, state::AppState};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebServerConfig {
@@ -37,6 +34,8 @@ struct ApiDoc;
 pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/accounts", account::router())
+        .nest("/keys", keys::router())
+        .nest("/messages", messages::router())
         .merge(registration::router())
         .with_state(Arc::new(state))
         .layer(CorsLayer::permissive())

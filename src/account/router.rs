@@ -1,9 +1,8 @@
-use std::sync::Arc;
-
 use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
+use std::sync::Arc;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::state::AppState;

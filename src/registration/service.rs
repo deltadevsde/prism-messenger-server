@@ -1,10 +1,10 @@
+use anyhow::Result;
+use prism_common::{digest::Digest, operation::ServiceChallengeInput};
+use prism_keys::{SigningKey, VerifyingKey};
 use std::sync::Arc;
 
 use crate::common::prism_client::PrismClient;
 use crate::PRISM_MESSENGER_SERVICE_ID;
-use anyhow::Result;
-use prism_common::{digest::Digest, operation::ServiceChallengeInput};
-use prism_keys::{SigningKey, VerifyingKey};
 
 pub struct RegistrationService<C: PrismClient> {
     prism: Arc<C>,
