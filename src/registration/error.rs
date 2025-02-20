@@ -1,9 +1,9 @@
+use axum::http::StatusCode;
+use prism_client::{PrismApiError, TransactionError};
 use std::{
     error::Error,
     fmt::{Display, Formatter},
 };
-
-use prism_client::TransactionError;
 
 #[derive(Debug)]
 pub enum RegistrationError {
@@ -23,5 +23,19 @@ impl Error for RegistrationError {}
 impl From<TransactionError> for RegistrationError {
     fn from(_: TransactionError) -> Self {
         Self::ProcessingFailed
+    }
+}
+
+impl From<PrismApiError> for RegistrationError {
+    fn from(_: PrismApiError) -> Self {
+        Self::ProcessingFailed
+    }
+}
+
+impl From<RegistrationError> for StatusCode {
+    fn from(err: RegistrationError) -> Self {
+        match err {
+            RegistrationError::ProcessingFailed => StatusCode::INTERNAL_SERVER_ERROR,
+        }
     }
 }
