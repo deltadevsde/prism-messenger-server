@@ -1,4 +1,4 @@
-use prism_keys::SigningKey;
+use prism_client::SigningKey;
 use prism_prover::Prover;
 use std::sync::Arc;
 

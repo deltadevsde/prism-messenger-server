@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
-use prism_keys::VerifyingKey;
+use prism_client::VerifyingKey;
 use serde::Deserialize;
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -17,12 +17,12 @@ pub struct RegistrationRequest {
 }
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
-    OpenApiRouter::new().routes(routes!(post_registration))
+    OpenApiRouter::new().routes(routes!(post_request_registration))
 }
 
 #[utoipa::path(
     post,
-    path = "/register",
+    path = "/request",
     request_body = RegistrationRequest,
     responses(
         (status = 200, description = "Registered successfully"),
@@ -30,13 +30,13 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
     ),
     tag = REGISTRATION_TAG
 )]
-async fn post_registration(
+async fn post_request_registration(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RegistrationRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
     state
         .registration_service
-        .create_account(req.username, req.key)
+        .request_registration(req.username, req.key)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

@@ -1,3 +1,5 @@
+pub mod entities;
+pub mod error;
 mod router;
 pub mod service;
 

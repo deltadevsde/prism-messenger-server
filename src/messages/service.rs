@@ -49,7 +49,7 @@ impl<D: MessageDatabase> MessagingService<D> {
 mod tests {
     use std::sync::Arc;
 
-    use prism_keys::SigningKey;
+    use prism_client::SigningKey;
     use uuid::Uuid;
 
     use crate::database::inmemory::InMemoryDatabase;
