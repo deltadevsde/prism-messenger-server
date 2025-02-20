@@ -1,4 +1,4 @@
-use prism_keys::VerifyingKey;
+use prism_client::VerifyingKey;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
