@@ -18,11 +18,9 @@ utoipa-axum = { version = "0.2.0" }
 prism-prover = { path = "../prism/crates/node_types/prover", features = [
     "mock_prover",
 ] }
-prism-common = { path = "../prism/crates/common" }
-prism-keys = { path = "../prism/crates/keys" }
-prism-tree = { path = "../prism/crates/tree" }
-prism-storage = { path = "../prism/crates/storage" }
+prism-client = { path = "../prism/crates/client", features = ["mockall"] }
 prism-da = { path = "../prism/crates/da" }
+prism-storage = { path = "../prism/crates/storage" }
 keystore-rs = { version = "0.3" }
 
 # Errors
