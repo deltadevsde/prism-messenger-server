@@ -1,5 +1,4 @@
 mod account;
-mod common;
 mod database;
 mod keys;
 mod messages;
@@ -8,12 +7,10 @@ mod state;
 mod webserver;
 
 use anyhow::{anyhow, Result};
-use common::prism_client::PrismClient as _;
 use keystore_rs::{KeyChain, KeyStore};
 use log::debug;
-use prism_common::operation::ServiceChallenge;
+use prism_client::{PendingTransaction as _, PrismApi as _, SigningKey};
 use prism_da::{memory::InMemoryDataAvailabilityLayer, DataAvailabilityLayer};
-use prism_keys::SigningKey;
 use prism_prover::{webserver::WebServerConfig as PrismWebServerConfig, Config, Prover};
 use prism_storage::inmemory::InMemoryDatabase;
 use state::AppState;
@@ -102,9 +99,13 @@ async fn register_messenger_service(prover: Arc<Prover>, signing_key: &SigningKe
     prover
         .register_service(
             PRISM_MESSENGER_SERVICE_ID.to_string(),
-            ServiceChallenge::Signed(signing_key.verifying_key()),
             signing_key.verifying_key(),
             signing_key,
         )
         .await
+        .map_err(anyhow::Error::from)?
+        .wait()
+        .await
+        .map_err(anyhow::Error::from)?;
+    Ok(())
 }

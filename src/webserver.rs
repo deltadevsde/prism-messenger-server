@@ -36,7 +36,7 @@ pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
         .nest("/accounts", account::router())
         .nest("/keys", keys::router())
         .nest("/messages", messages::router())
-        .merge(registration::router())
+        .nest("/registration", registration::router())
         .with_state(Arc::new(state))
         .layer(CorsLayer::permissive())
         .split_for_parts();
