@@ -1,11 +1,14 @@
 [package]
-name = "prism-messenger-backend"
+name = "prism-messenger-server"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-# Webserver
+# async
 tokio = { version = "1.16.1", features = ["full"] }
+always_send = { version = "0.1.1" }
+
+# Webserver
 axum = "0.8"
 tower-http = { version = "0.6", features = ["cors"] }
 
@@ -32,6 +35,7 @@ pretty_env_logger = "0.5.0"
 
 # Serialization/Deserialization
 serde = { version = "1.0.151", features = ["derive"] }
+serde_with = { version = "3.12.0", features = ["base64"] }
 uuid = { version = "1.13.1", features = [
     "serde",
     "v4",       # Lets you generate random UUIDs
