@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use prism_keys::{Signature, VerifyingKey};
+use prism_client::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

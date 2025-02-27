@@ -1,19 +1,18 @@
 use anyhow::Result;
+use prism_client::PrismApi;
 use std::sync::Arc;
 
-use crate::common::prism_client::PrismClient;
-
-pub struct AccountService<C: PrismClient> {
-    client: Arc<C>,
+pub struct AccountService<P: PrismApi> {
+    prism: Arc<P>,
 }
 
-impl<C: PrismClient> AccountService<C> {
-    pub fn new(client: Arc<C>) -> Self {
-        Self { client }
+impl<P: PrismApi> AccountService<P> {
+    pub fn new(prism: Arc<P>) -> Self {
+        Self { prism }
     }
 
     pub async fn username_exists(&self, username: &str) -> Result<bool> {
-        let account_res = self.client.clone().get_account(username).await?;
+        let account_res = self.prism.clone().get_account(username).await?;
 
         Ok(account_res.account.is_some())
     }
@@ -23,17 +22,13 @@ impl<C: PrismClient> AccountService<C> {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{
-        account::service::AccountService,
-        common::prism_client::{AccountResponse, MockPrismClient},
-    };
+    use crate::account::service::AccountService;
     use mockall::predicate::eq;
-    use prism_common::account::Account;
-    use prism_tree::proofs::HashedMerkleProof;
+    use prism_client::{mock::MockPrismApi, Account, AccountResponse, HashedMerkleProof};
 
     #[tokio::test]
     async fn test_username_exists_returns_true_when_found() {
-        let mut mock_client = MockPrismClient::new();
+        let mut mock_client = MockPrismApi::new();
         mock_client
             .expect_get_account()
             .once()
@@ -52,7 +47,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_username_exists_returns_false_when_not_found() {
-        let mut mock_client = MockPrismClient::new();
+        let mut mock_client = MockPrismApi::new();
         mock_client
             .expect_get_account()
             .once()

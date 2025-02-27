@@ -1,11 +1,8 @@
 use anyhow::{anyhow, Result};
-use prism_common::account::Account;
-use prism_tree::proofs::HashedMerkleProof;
+use prism_client::{Account, HashedMerkleProof, PrismApi};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
-
-use crate::common::prism_client::PrismClient;
 
 use super::{
     database::KeyDatabase,
@@ -19,22 +16,22 @@ pub struct KeyBundleResponse {
     pub proof: HashedMerkleProof,
 }
 
-pub struct KeyService<C, D>
+pub struct KeyService<P, D>
 where
-    C: PrismClient,
+    P: PrismApi,
     D: KeyDatabase,
 {
-    client: Arc<C>,
+    prism: Arc<P>,
     db: Arc<D>,
 }
 
-impl<C, D> KeyService<C, D>
+impl<P, D> KeyService<P, D>
 where
-    C: PrismClient,
+    P: PrismApi,
     D: KeyDatabase,
 {
-    pub fn new(client: Arc<C>, db: Arc<D>) -> Self {
-        Self { client, db }
+    pub fn new(prism: Arc<P>, db: Arc<D>) -> Self {
+        Self { prism, db }
     }
 
     pub fn upload_key_bundle(&self, user_id: &str, bundle: KeyBundle) -> Result<bool> {
@@ -75,7 +72,7 @@ where
 
     pub async fn get_keybundle(&self, user_id: &str) -> Result<KeyBundleResponse> {
         let keybundle = self.db.get_keybundle(user_id.to_string())?;
-        let account_response = self.client.get_account(user_id).await?;
+        let account_response = self.prism.get_account(user_id).await?;
 
         let response = KeyBundleResponse {
             key_bundle: keybundle,
