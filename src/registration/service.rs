@@ -1,4 +1,4 @@
-use prism_client::{binary::ToBinary as _, PrismApi, SigningKey, VerifyingKey};
+use prism_client::{PrismApi, SigningKey, VerifyingKey};
 use std::sync::Arc;
 
 use crate::PRISM_MESSENGER_SERVICE_ID;
@@ -36,8 +36,7 @@ where
             .for_service_with_id(PRISM_MESSENGER_SERVICE_ID.to_string())
             .meeting_signed_challenge(&self.signing_key)?
             .transaction()
-            .encode_to_bytes()
-            .map_err(|_| RegistrationError::ProcessingFailed)?;
+            .signing_payload()?;
 
         Ok(RegistrationChallenge(bytes_to_be_signed))
     }
