@@ -1,7 +1,5 @@
 use always_send::FutureExt;
-use prism_client::{
-    PendingTransaction, PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey,
-};
+use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey};
 use std::sync::Arc;
 
 use crate::PRISM_MESSENGER_SERVICE_ID;
@@ -65,8 +63,6 @@ where
             .send()
             // working around rust #100031 with always_send()
             .always_send()
-            .await?
-            .wait()
             .await?;
 
         Ok(())
