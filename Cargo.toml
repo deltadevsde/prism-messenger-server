@@ -1,5 +1,5 @@
 [package]
-name = "prism-messenger-backend"
+name = "prism-messenger-server"
 version = "0.1.0"
 edition = "2021"
 
