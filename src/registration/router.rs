@@ -2,6 +2,7 @@ use anyhow::Result;
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use prism_client::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use std::sync::Arc;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -18,8 +19,10 @@ pub struct RequestRegistrationRequest {
     pub key: VerifyingKey,
 }
 
+#[serde_as]
 #[derive(Serialize, ToSchema)]
 pub struct RequestRegistrationResponse {
+    #[serde_as(as = "Base64")]
     pub challenge: Vec<u8>,
 }
 
