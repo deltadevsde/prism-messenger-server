@@ -22,7 +22,7 @@ pub struct KeyBundle {
 impl KeyBundle {
     pub fn verify(&self) -> Result<()> {
         // Ensure signature is signed_prekey signed by identity_key
-        let msg = self.identity_key.to_der()?;
+        let msg = self.signed_prekey.to_der()?;
         self.identity_key
             .verify_signature(&msg, &self.signed_prekey_signature)?;
         // Ensure prekeys have no duplicate IDs
