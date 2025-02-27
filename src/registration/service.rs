@@ -1,3 +1,4 @@
+use always_send::FutureExt;
 use prism_client::{
     PendingTransaction, PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey,
 };
@@ -62,11 +63,11 @@ where
             .meeting_signed_challenge(&self.signing_key)?
             .with_external_signature(signature_bundle)
             .send()
-            .await
-            .map_err(|_| RegistrationError::ProcessingFailed)?
+            // working around rust #100031 with always_send()
+            .always_send()
+            .await?
             .wait()
-            .await
-            .map_err(|_| RegistrationError::ProcessingFailed)?;
+            .await?;
 
         Ok(())
     }

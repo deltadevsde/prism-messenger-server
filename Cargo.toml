@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Webserver
+# async
 tokio = { version = "1.16.1", features = ["full"] }
+always_send = { version = "0.1.1" }
+
+# Webserver
 axum = "0.8"
 tower-http = { version = "0.6", features = ["cors"] }
 
