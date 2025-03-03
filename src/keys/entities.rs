@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use prism_client::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
