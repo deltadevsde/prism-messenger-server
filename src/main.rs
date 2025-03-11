@@ -6,23 +6,27 @@ mod registration;
 mod state;
 mod webserver;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use keystore_rs::{KeyChain, KeyStore};
 use log::debug;
 use prism_client::{PendingTransaction as _, PrismApi as _, SigningKey};
-use prism_da::{memory::InMemoryDataAvailabilityLayer, DataAvailabilityLayer};
-use prism_prover::{webserver::WebServerConfig as PrismWebServerConfig, Config, Prover};
+use prism_da::{DataAvailabilityLayer, memory::InMemoryDataAvailabilityLayer};
+use prism_prover::{Config, Prover, webserver::WebServerConfig as PrismWebServerConfig};
 use prism_storage::inmemory::InMemoryDatabase;
 use state::AppState;
 use std::sync::Arc;
 use tokio::spawn;
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use webserver::WebServerConfig;
 
 pub static PRISM_MESSENGER_SERVICE_ID: &str = "prism_messenger";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    pretty_env_logger::init();
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::from_env("RUST_LOG"))
+        .init();
 
     let db = InMemoryDatabase::new();
     let (da_layer, _, _) = InMemoryDataAvailabilityLayer::new(5);
