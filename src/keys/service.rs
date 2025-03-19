@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use prism_client::{Account, HashedMerkleProof, PrismApi};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -10,6 +10,7 @@ use super::{
 };
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct KeyBundleResponse {
     pub key_bundle: Option<KeyBundle>,
     pub account: Option<Account>,
