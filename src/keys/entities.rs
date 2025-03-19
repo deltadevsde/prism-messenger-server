@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Prekey {
     pub key_idx: u64,
     pub key: VerifyingKey,
@@ -12,6 +13,7 @@ pub struct Prekey {
 /// The complete key bundle contains the long-term identity key,
 /// the signed pre-key (with its signature), and a list of one-time pre-keys.
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct KeyBundle {
     pub identity_key: VerifyingKey,
     pub signed_prekey: VerifyingKey,

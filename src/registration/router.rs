@@ -14,6 +14,7 @@ use super::entities::RegistrationChallenge;
 const REGISTRATION_TAG: &str = "registration";
 
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestRegistrationRequest {
     pub username: String,
     pub key: VerifyingKey,
@@ -21,6 +22,7 @@ pub struct RequestRegistrationRequest {
 
 #[serde_as]
 #[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestRegistrationResponse {
     #[serde_as(as = "Base64")]
     pub challenge: Vec<u8>,
@@ -35,6 +37,7 @@ impl From<RegistrationChallenge> for RequestRegistrationResponse {
 }
 
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FinalizeRegistrationRequest {
     pub username: String,
     pub key: VerifyingKey,

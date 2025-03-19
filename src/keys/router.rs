@@ -1,8 +1,8 @@
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -18,12 +18,14 @@ use crate::state::AppState;
 const KEY_TAG: &str = "keys";
 
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UploadKeyBundleRequest {
     pub user_id: String,
-    pub keybundle: KeyBundle,
+    pub key_bundle: KeyBundle,
 }
 
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UploadPrekeysRequest {
     pub user_id: String,
     pub prekeys: Vec<Prekey>,
@@ -52,7 +54,7 @@ async fn post_keybundle(
 ) -> Result<impl IntoResponse, StatusCode> {
     state
         .key_service
-        .upload_key_bundle(&req.user_id, req.keybundle)
+        .upload_key_bundle(&req.user_id, req.key_bundle)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(())
