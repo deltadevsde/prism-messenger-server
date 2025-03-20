@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::sync::Arc;
 
 use super::{
@@ -80,6 +80,7 @@ mod tests {
         let message = DoubleRatchetMessage {
             header,
             ciphertext: "Hello, Alice".as_bytes().to_vec(),
+            nonce: vec![0; 12],
         };
 
         let request = SendMessageRequest {
@@ -124,6 +125,7 @@ mod tests {
             let new_message = DoubleRatchetMessage {
                 header: new_header,
                 ciphertext: format!("Hello, Alice {}", i).as_bytes().to_vec(),
+                nonce: vec![0; 12],
             };
 
             let new_request = SendMessageRequest {

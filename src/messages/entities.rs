@@ -1,5 +1,6 @@
 use prism_client::VerifyingKey;
 use serde::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use utoipa::ToSchema;
 
 /// The header provides the recipient with the context needed to update
@@ -20,12 +21,16 @@ pub struct DoubleRatchetHeader {
 
 /// The complete double ratchet message.
 /// The header is bound to the ciphertext via the AEAD process.
+#[serde_as]
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DoubleRatchetMessage {
     pub header: DoubleRatchetHeader,
     /// AEAD-encrypted payload (includes authentication tag)
+    #[serde_as(as = "Base64")]
     pub ciphertext: Vec<u8>,
+    #[serde_as(as = "Base64")]
+    pub nonce: Vec<u8>,
 }
 
 /// When sending a message, the sender includes a full double ratchet message.
