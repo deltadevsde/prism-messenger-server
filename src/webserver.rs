@@ -3,10 +3,10 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use utoipa::{
-    openapi::{Info, OpenApiBuilder},
     OpenApi,
+    openapi::{Info, OpenApiBuilder},
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
@@ -39,6 +39,7 @@ pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
         .nest("/registration", registration::router())
         .with_state(Arc::new(state))
         .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http())
         .split_for_parts();
 
     let api = OpenApiBuilder::from(api)
