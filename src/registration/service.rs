@@ -2,24 +2,33 @@ use always_send::FutureExt;
 use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey};
 use std::sync::Arc;
 
-use crate::PRISM_MESSENGER_SERVICE_ID;
 
 use super::{entities::RegistrationChallenge, error::RegistrationError};
+use crate::{
+    PRISM_MESSENGER_SERVICE_ID, account::database::AccountDatabase, account::entities::Account,
+};
 
-pub struct RegistrationService<P>
+pub struct RegistrationService<P, D>
 where
     P: PrismApi,
+    D: AccountDatabase,
 {
     prism: Arc<P>,
     signing_key: SigningKey,
+    account_database: Arc<D>,
 }
 
-impl<P> RegistrationService<P>
+impl<P, D> RegistrationService<P, D>
 where
     P: PrismApi,
+    D: AccountDatabase,
 {
-    pub fn new(prism: Arc<P>, signing_key: SigningKey) -> Self {
-        Self { prism, signing_key }
+    pub fn new(prism: Arc<P>, account_database: Arc<D>, signing_key: SigningKey) -> Self {
+        Self {
+            prism,
+            account_database,
+            signing_key,
+        }
     }
 
     pub async fn request_registration(

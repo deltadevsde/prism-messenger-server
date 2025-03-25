@@ -12,7 +12,7 @@ pub struct AppState {
     pub account_service: AccountService<Prover>,
     pub key_service: KeyService<Prover, InMemoryDatabase>,
     pub messaging_service: MessagingService<InMemoryDatabase>,
-    pub registration_service: RegistrationService<Prover>,
+    pub registration_service: RegistrationService<Prover, InMemoryDatabase>,
 }
 
 impl AppState {
@@ -20,7 +20,8 @@ impl AppState {
         let db = Arc::new(InMemoryDatabase::new());
 
         let account_service = AccountService::new(prover.clone());
-        let registration_service = RegistrationService::new(prover.clone(), signing_key);
+        let registration_service =
+            RegistrationService::new(prover.clone(), db.clone(), signing_key);
         let key_service = KeyService::new(prover.clone(), db.clone());
         let messaging_service = MessagingService::new(db.clone());
 

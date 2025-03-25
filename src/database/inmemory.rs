@@ -1,8 +1,14 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 use crate::{
+    account::{
+        database::{AccountDatabase, AccountDatabaseError},
+        entities::Account,
+    },
     keys::{
         database::KeyDatabase,
         entities::{KeyBundle, Prekey},
@@ -11,6 +17,7 @@ use crate::{
 };
 
 pub struct InMemoryDatabase {
+    pub accounts: Mutex<HashMap<Uuid, Account>>,
     pub key_bundles: Mutex<HashMap<String, KeyBundle>>,
     pub messages: Mutex<HashMap<String, Vec<Message>>>,
 }
@@ -18,9 +25,58 @@ pub struct InMemoryDatabase {
 impl InMemoryDatabase {
     pub fn new() -> Self {
         InMemoryDatabase {
+            accounts: Mutex::new(HashMap::new()),
             key_bundles: Mutex::new(HashMap::new()),
             messages: Mutex::new(HashMap::new()),
         }
+    }
+}
+
+#[async_trait]
+impl AccountDatabase for InMemoryDatabase {
+    async fn insert_or_update(&self, account: Account) -> Result<(), AccountDatabaseError> {
+        let mut account_lock = self
+            .accounts
+            .lock()
+            .map_err(|_| AccountDatabaseError::OperationFailed)?;
+
+        account_lock.insert(account.id, account);
+        Ok(())
+    }
+
+    async fn fetch(&self, id: Uuid) -> Result<Account, AccountDatabaseError> {
+        let account_lock = self
+            .accounts
+            .lock()
+            .map_err(|_| AccountDatabaseError::OperationFailed)?;
+
+        account_lock
+            .get(&id)
+            .cloned()
+            .ok_or(AccountDatabaseError::NotFound(id))
+    }
+
+    async fn fetch_by_username(&self, username: &str) -> Result<Account, AccountDatabaseError> {
+        let account_lock = self
+            .accounts
+            .lock()
+            .map_err(|_| AccountDatabaseError::OperationFailed)?;
+
+        account_lock
+            .values()
+            .find(|account| account.username == username)
+            .cloned()
+            .ok_or(AccountDatabaseError::OperationFailed)
+    }
+
+    async fn remove(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
+        let mut account_lock = self
+            .accounts
+            .lock()
+            .map_err(|_| AccountDatabaseError::OperationFailed)?;
+
+        account_lock.remove(&id);
+        Ok(())
     }
 }
 

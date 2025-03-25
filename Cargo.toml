@@ -7,6 +7,7 @@ edition = "2024"
 # async
 tokio = { version = "1.16.1", features = ["full"] }
 always_send = { version = "0.1.1" }
+async-trait = { version = "0.1.88" }
 
 # Webserver
 axum = { version = "0.8", features = ["tracing"] }
@@ -28,6 +29,7 @@ keystore-rs = { version = "0.3" }
 
 # Errors
 anyhow = "1.0.95"
+thiserror = "2"
 
 # Logging
 log = "0.4.7"

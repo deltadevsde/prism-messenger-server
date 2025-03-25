@@ -24,7 +24,7 @@ mod tests {
 
     use crate::account::service::AccountService;
     use mockall::predicate::eq;
-    use prism_client::{mock::MockPrismApi, Account, AccountResponse, HashedMerkleProof};
+    use prism_client::{Account, AccountResponse, HashedMerkleProof, mock::MockPrismApi};
 
     #[tokio::test]
     async fn test_username_exists_returns_true_when_found() {
