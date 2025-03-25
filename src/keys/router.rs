@@ -1,7 +1,8 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, State},
     http::StatusCode,
+    middleware::from_fn_with_state,
     response::IntoResponse,
 };
 use serde::Deserialize;
@@ -13,29 +14,31 @@ use super::{
     entities::{KeyBundle, Prekey},
     service::KeyBundleResponse,
 };
-use crate::state::AppState;
+use crate::{
+    account::{auth::middleware::require_auth, entities::Account},
+    state::AppState,
+};
 
 const KEY_TAG: &str = "keys";
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadKeyBundleRequest {
-    pub user_id: String,
     pub key_bundle: KeyBundle,
 }
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPrekeysRequest {
-    pub user_id: String,
     pub prekeys: Vec<Prekey>,
 }
 
-pub fn router() -> OpenApiRouter<Arc<AppState>> {
+pub fn router(state: Arc<AppState>) -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(post_keybundle))
         .routes(routes!(get_keybundle))
         .routes(routes!(post_prekeys))
+        .layer(from_fn_with_state(state.clone(), require_auth))
 }
 
 #[utoipa::path(
@@ -50,11 +53,12 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
 )]
 async fn post_keybundle(
     State(state): State<Arc<AppState>>,
+    Extension(account): Extension<Account>,
     Json(req): Json<UploadKeyBundleRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
     state
         .key_service
-        .upload_key_bundle(&req.user_id, req.key_bundle)
+        .upload_key_bundle(&account.username, req.key_bundle)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(())
@@ -72,11 +76,12 @@ async fn post_keybundle(
 )]
 async fn post_prekeys(
     State(state): State<Arc<AppState>>,
+    Extension(account): Extension<Account>,
     Json(req): Json<UploadPrekeysRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
     state
         .key_service
-        .add_prekeys(&req.user_id, req.prekeys)
+        .add_prekeys(&account.username, req.prekeys)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(())
@@ -84,9 +89,9 @@ async fn post_prekeys(
 
 #[utoipa::path(
     get,
-    path = "/bundle/{user_id}",
+    path = "/bundle/{username}",
     params(
-        ("user_id" = String, Path, description = "User identifier")
+        ("username" = String, Path, description = "User identifier")
     ),
     responses(
         (status = 200, description = "Key bundle retrieved successfully", body = KeyBundleResponse),
@@ -95,12 +100,12 @@ async fn post_prekeys(
     tag = KEY_TAG
 )]
 async fn get_keybundle(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(username): Path<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
     state
         .key_service
-        .get_keybundle(&user_id)
+        .get_keybundle(&username)
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)

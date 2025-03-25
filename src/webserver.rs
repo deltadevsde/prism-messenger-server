@@ -32,12 +32,13 @@ impl Default for WebServerConfig {
 struct ApiDoc;
 
 pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
+    let state_arc = Arc::new(state);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/accounts", account::router())
-        .nest("/keys", keys::router())
+        .nest("/keys", keys::router(state_arc.clone()))
         .nest("/messages", messages::router())
         .nest("/registration", registration::router())
-        .with_state(Arc::new(state))
+        .with_state(state_arc)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .split_for_parts();

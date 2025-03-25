@@ -81,36 +81,36 @@ impl AccountDatabase for InMemoryDatabase {
 }
 
 impl KeyDatabase for InMemoryDatabase {
-    fn insert_keybundle(&self, user: String, key_bundle: KeyBundle) -> Result<bool> {
+    fn insert_keybundle(&self, username: &str, key_bundle: KeyBundle) -> Result<bool> {
         let mut kb_lock = self
             .key_bundles
             .lock()
             .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
-        kb_lock.insert(user, key_bundle);
+        kb_lock.insert(username.to_string(), key_bundle);
         Ok(true)
     }
 
-    fn get_keybundle(&self, user: String) -> Result<Option<KeyBundle>> {
+    fn get_keybundle(&self, username: &str) -> Result<Option<KeyBundle>> {
         let kb_lock = self
             .key_bundles
             .lock()
             .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
         // Return a clone of the key bundle if it exists.
-        Ok(kb_lock.get(&user).cloned())
+        Ok(kb_lock.get(username).cloned())
     }
 
-    fn add_prekeys(&self, user: String, prekeys: Vec<Prekey>) -> Result<bool> {
+    fn add_prekeys(&self, username: &str, prekeys: Vec<Prekey>) -> Result<bool> {
         let mut kb_lock = self
             .key_bundles
             .lock()
             .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
 
-        if let Some(bundle) = kb_lock.get_mut(&user) {
+        if let Some(bundle) = kb_lock.get_mut(username) {
             // TODO: Ensure no duplicate prekey ids are added.
             bundle.prekeys.extend(prekeys);
             Ok(true)
         } else {
-            Err(anyhow!("Key bundle not found for user: {}", user))
+            Err(anyhow!("Key bundle not found for user: {}", username))
         }
     }
 }
