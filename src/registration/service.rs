@@ -1,7 +1,7 @@
 use always_send::FutureExt;
 use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey};
 use std::sync::Arc;
-
+use tracing::{debug, info, instrument};
 
 use super::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
@@ -31,6 +31,7 @@ where
         }
     }
 
+    #[instrument(skip_all, fields(username = username, key = %user_identity_verifying_key))]
     pub async fn request_registration(
         &self,
         username: String,
@@ -51,20 +52,25 @@ where
         Ok(RegistrationChallenge(bytes_to_be_signed))
     }
 
+    #[instrument(skip_all, fields(username = username, key = %user_identity_verifying_key, signature = %registration_signature))]
     pub async fn finalize_registration(
         &self,
         username: String,
         user_identity_verifying_key: VerifyingKey,
         registration_signature: Signature,
+        auth_password: &str,
     ) -> Result<(), RegistrationError> {
+        debug!("Starting registration finalization");
+
         let signature_bundle =
             SignatureBundle::new(user_identity_verifying_key.clone(), registration_signature);
 
+        debug!("Sending request to prism API");
         self.prism
             .clone()
             .build_request()
             .create_account()
-            .with_id(username)
+            .with_id(username.clone())
             .with_key(user_identity_verifying_key)
             .for_service_with_id(PRISM_MESSENGER_SERVICE_ID.to_string())
             .meeting_signed_challenge(&self.signing_key)?
@@ -74,13 +80,22 @@ where
             .always_send()
             .await?;
 
+        info!(username, "Successfully created account on prism");
+        let account = Account::new(username, auth_password);
+
+        debug!(?account, "Saving created account in local database");
+        self.account_database
+            .clone()
+            .insert_or_update(account)
+            .await?;
+
+        info!("Registration completed successfully");
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::registration::service::RegistrationService;
     use anyhow::Result;
     use prism_client::{
         Account, SigningKey,
@@ -88,14 +103,24 @@ mod tests {
     };
     use std::sync::Arc;
 
+    use crate::{
+        account::database::MockAccountDatabase, registration::service::RegistrationService,
+    };
+
     #[tokio::test]
     async fn test_create_account() -> Result<()> {
         let mut mock_prism = MockPrismApi::new();
+        let mut mock_account_db = MockAccountDatabase::new();
         let service_signing_key = SigningKey::new_ed25519();
 
         let username = "test_user".to_string();
         let user_identity_signing_key = SigningKey::new_secp256r1();
         let user_identity_verifying_key = user_identity_signing_key.verifying_key();
+
+        mock_account_db
+            .expect_insert_or_update()
+            .times(1)
+            .returning(|_| Ok(()));
 
         mock_prism
             .expect_post_transaction()
@@ -106,8 +131,12 @@ mod tests {
                 )))
             });
 
-        // Wrap the configured mock in an Arc and create the service
-        let service = RegistrationService::new(Arc::new(mock_prism), service_signing_key.clone());
+        // Wrap the configured mocks in Arc and create the service
+        let service = RegistrationService::new(
+            Arc::new(mock_prism),
+            Arc::new(mock_account_db),
+            service_signing_key.clone(),
+        );
 
         // Simulate a client requesting registration
         let registration_challenge = service
@@ -121,7 +150,12 @@ mod tests {
 
         // Simulate a client finalizing the registration
         service
-            .finalize_registration(username, user_identity_verifying_key, challenge_signature)
+            .finalize_registration(
+                username,
+                user_identity_verifying_key,
+                challenge_signature,
+                "TODO",
+            )
             .await?;
 
         Ok(())
