@@ -3,13 +3,16 @@ use prism_prover::Prover;
 use std::sync::Arc;
 
 use crate::{
-    account::service::AccountService, database::inmemory::InMemoryDatabase,
-    keys::service::KeyService, messages::service::MessagingService,
+    account::{auth::service::AuthService, service::AccountService},
+    database::inmemory::InMemoryDatabase,
+    keys::service::KeyService,
+    messages::service::MessagingService,
     registration::service::RegistrationService,
 };
 
 pub struct AppState {
     pub account_service: AccountService<Prover>,
+    pub auth_service: AuthService<InMemoryDatabase>,
     pub key_service: KeyService<Prover, InMemoryDatabase>,
     pub messaging_service: MessagingService<InMemoryDatabase>,
     pub registration_service: RegistrationService<Prover, InMemoryDatabase>,
@@ -20,6 +23,7 @@ impl AppState {
         let db = Arc::new(InMemoryDatabase::new());
 
         let account_service = AccountService::new(prover.clone());
+        let auth_service = AuthService::new(db.clone());
         let registration_service =
             RegistrationService::new(prover.clone(), db.clone(), signing_key);
         let key_service = KeyService::new(prover.clone(), db.clone());
@@ -27,6 +31,7 @@ impl AppState {
 
         Self {
             account_service,
+            auth_service,
             registration_service,
             key_service,
             messaging_service,

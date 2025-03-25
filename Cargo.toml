@@ -38,6 +38,7 @@ thiserror = "2"
 log = "0.4.7"
 
 # Serialization/Deserialization
+base64 = "0.22.1"
 serde = { version = "1.0.151", features = ["derive"] }
 serde_with = { version = "3.12.0", features = ["base64"] }
 uuid = { version = "1.13.1", features = [
