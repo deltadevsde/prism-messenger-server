@@ -18,6 +18,9 @@ utoipa = { version = "5.3", features = ["axum_extras", "uuid"] }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-axum = { version = "0.2.0" }
 
+# Crypto
+argon2 = "0.5.3"
+
 # Prism
 prism-prover = { path = "../prism/crates/node_types/prover", features = [
     "mock_prover",

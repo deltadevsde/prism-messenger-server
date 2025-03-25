@@ -1,4 +1,5 @@
 mod account;
+mod crypto;
 mod database;
 mod keys;
 mod messages;
