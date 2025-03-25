@@ -117,39 +117,38 @@ impl KeyDatabase for InMemoryDatabase {
 
 impl MessageDatabase for InMemoryDatabase {
     fn insert_message(&self, message: Message) -> Result<bool> {
-        let user = message.recipient_id.clone();
         let mut messages_lock = self
             .messages
             .lock()
             .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
         messages_lock
-            .entry(user)
+            .entry(message.recipient_username.clone())
             .or_insert_with(Vec::new)
             .push(message);
         Ok(true)
     }
 
-    fn get_messages(&self, user: String) -> Result<Vec<Message>> {
+    fn get_messages(&self, username: &str) -> Result<Vec<Message>> {
         let messages_lock = self
             .messages
             .lock()
             .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
         // Return a cloned vector of messages (if any) so that users can work on their own copy.
-        Ok(messages_lock.get(&user).cloned().unwrap_or_default())
+        Ok(messages_lock.get(username).cloned().unwrap_or_default())
     }
 
-    fn mark_delivered(&self, user: String, ids: Vec<uuid::Uuid>) -> Result<bool> {
+    fn mark_delivered(&self, username: &str, ids: Vec<uuid::Uuid>) -> Result<bool> {
         let mut messages_lock = self
             .messages
             .lock()
             .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
-        if let Some(messages) = messages_lock.get_mut(&user) {
-            let original_len = messages.len();
-            // Remove any messages whose message_id is in ids
-            messages.retain(|msg| !ids.contains(&msg.message_id));
-            Ok(messages.len() != original_len)
-        } else {
-            Ok(false)
-        }
+        let Some(messages) = messages_lock.get_mut(username) else {
+            return Ok(false);
+        };
+
+        let original_len = messages.len();
+        // Remove any messages whose message_id is in ids
+        messages.retain(|msg| !ids.contains(&msg.message_id));
+        Ok(messages.len() != original_len)
     }
 }

@@ -36,7 +36,7 @@ pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/accounts", account::router())
         .nest("/keys", keys::router(state_arc.clone()))
-        .nest("/messages", messages::router())
+        .nest("/messages", messages::router(state_arc.clone()))
         .nest("/registration", registration::router())
         .with_state(state_arc)
         .layer(CorsLayer::permissive())
