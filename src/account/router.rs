@@ -15,7 +15,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
 
 #[utoipa::path(
     head,
-    path = "/accounts/{username}",
+    path = "/account/{username}",
     tag = ACCOUNTS_TAG,
     params(("id" = String, Path, description = "Account identifier")),
     responses(
