@@ -43,7 +43,7 @@ pub fn router(state: Arc<AppState>) -> OpenApiRouter<Arc<AppState>> {
 
 #[utoipa::path(
     post,
-    path = "/upload_bundle",
+    path = "/bundle",
     request_body = UploadKeyBundleRequest,
     responses(
         (status = 200, description = "Bundle upload successful"),
