@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use prism_client::{Account, HashedMerkleProof, PrismApi};
+use prism_client::{Account as PrismAccount, HashedMerkleProof, PrismApi};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -13,7 +13,7 @@ use super::{
 #[serde(rename_all = "camelCase")]
 pub struct KeyBundleResponse {
     pub key_bundle: Option<KeyBundle>,
-    pub account: Option<Account>,
+    pub account: Option<PrismAccount>,
     pub proof: HashedMerkleProof,
 }
 
@@ -35,20 +35,20 @@ where
         Self { prism, db }
     }
 
-    pub fn upload_key_bundle(&self, user_id: &str, bundle: KeyBundle) -> Result<bool> {
+    pub fn upload_key_bundle(&self, username: &str, bundle: KeyBundle) -> Result<bool> {
         bundle.verify()?;
 
         // A key bundle can be inserted before the user has been successfully
         // added to prism's state.
-        self.db.insert_keybundle(user_id.to_string(), bundle)
+        self.db.insert_keybundle(username, bundle)
     }
 
     // Note: There is no extra security assumption here: Even if the server is
     // malicious and adds extra prekeys for a user, the server will still be
     // unable to decrypt anything, and the receiver simply won't be able to
     // decrypt the messages either.
-    pub fn add_prekeys(&self, user_id: &str, prekeys: Vec<Prekey>) -> Result<bool> {
-        let key_bundle = self.db.get_keybundle(user_id.to_string())?;
+    pub fn add_prekeys(&self, username: &str, prekeys: Vec<Prekey>) -> Result<bool> {
+        let key_bundle = self.db.get_keybundle(username)?;
         if key_bundle.is_none() {
             return Err(anyhow!(
                 "User either does not exist or has not uploaded a key bundle"
@@ -68,12 +68,13 @@ where
         {
             return Err(anyhow!("Duplicate prekey ID"));
         }
-        self.db.add_prekeys(user_id.to_string(), prekeys)
+        self.db.add_prekeys(username, prekeys)
     }
 
-    pub async fn get_keybundle(&self, user_id: &str) -> Result<KeyBundleResponse> {
-        let keybundle = self.db.get_keybundle(user_id.to_string())?;
-        let account_response = self.prism.get_account(user_id).await?;
+    pub async fn get_keybundle(&self, username: &str) -> Result<KeyBundleResponse> {
+        let keybundle = self.db.get_keybundle(username)?;
+        // TODO: clarify whether prism will store user_id or username
+        let account_response = self.prism.get_account(username).await?;
 
         let response = KeyBundleResponse {
             key_bundle: keybundle,

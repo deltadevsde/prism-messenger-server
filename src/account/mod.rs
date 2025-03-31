@@ -1,3 +1,6 @@
+pub mod auth;
+pub mod database;
+pub mod entities;
 mod router;
 pub mod service;
 

@@ -2,6 +2,7 @@ use prism_client::VerifyingKey;
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 /// The header provides the recipient with the context needed to update
 /// its ratchet state. It includes the sender’s ephemeral public key and
@@ -33,22 +34,11 @@ pub struct DoubleRatchetMessage {
     pub nonce: Vec<u8>,
 }
 
-/// When sending a message, the sender includes a full double ratchet message.
-/// The server attaches the sender's identity based on the auth token.
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SendMessageRequest {
-    /// User ID - TODO: Should come from auth, not request body
-    pub sender_id: String,
-    pub recipient_id: String,
-    pub message: DoubleRatchetMessage,
-}
-
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SendMessageResponse {
+pub struct MessageReceipt {
     /// UUID
-    pub message_id: uuid::Uuid,
+    pub message_id: Uuid,
     /// Server timestamp (epoch milliseconds)
     pub timestamp: u64,
 }
@@ -58,16 +48,8 @@ pub struct SendMessageResponse {
 #[serde(rename_all = "camelCase")]
 pub struct Message {
     pub message_id: uuid::Uuid,
-    pub sender_id: String,
-    pub recipient_id: String,
+    pub sender_username: String,
+    pub recipient_username: String,
     pub message: DoubleRatchetMessage,
     pub timestamp: u64,
-}
-
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MarkDeliveredRequest {
-    /// User ID - TODO: Should come from auth, not request body
-    pub user_id: String,
-    pub message_ids: Vec<uuid::Uuid>,
 }

@@ -7,6 +7,7 @@ edition = "2024"
 # async
 tokio = { version = "1.16.1", features = ["full"] }
 always_send = { version = "0.1.1" }
+async-trait = { version = "0.1.88" }
 
 # Webserver
 axum = { version = "0.8", features = ["tracing"] }
@@ -16,6 +17,9 @@ tower-http = { version = "0.6", features = ["cors", "trace"] }
 utoipa = { version = "5.3", features = ["axum_extras", "uuid"] }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-axum = { version = "0.2.0" }
+
+# Crypto
+argon2 = "0.5.3"
 
 # Prism
 prism-prover = { path = "../prism/crates/node_types/prover", features = [
@@ -28,11 +32,13 @@ keystore-rs = { version = "0.3" }
 
 # Errors
 anyhow = "1.0.95"
+thiserror = "2"
 
 # Logging
 log = "0.4.7"
 
 # Serialization/Deserialization
+base64 = "0.22.1"
 serde = { version = "1.0.151", features = ["derive"] }
 serde_with = { version = "3.12.0", features = ["base64"] }
 uuid = { version = "1.13.1", features = [
