@@ -1,7 +1,7 @@
 use always_send::FutureExt;
 use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey};
 use std::sync::Arc;
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 
 use super::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
@@ -59,8 +59,15 @@ where
         user_identity_verifying_key: VerifyingKey,
         registration_signature: Signature,
         auth_password: &str,
+        apns_token: Option<Vec<u8>>,
+        gcm_token: Option<Vec<u8>>,
     ) -> Result<(), RegistrationError> {
         debug!("Starting registration finalization");
+
+        if apns_token.is_none() && gcm_token.is_none() {
+            error!("Missing push token");
+            return Err(RegistrationError::MissingPushToken);
+        }
 
         let signature_bundle =
             SignatureBundle::new(user_identity_verifying_key.clone(), registration_signature);
@@ -81,7 +88,7 @@ where
             .await?;
 
         info!(username, "Successfully created account on prism");
-        let account = Account::new(username, auth_password);
+        let account = Account::new(username, auth_password, apns_token, gcm_token);
 
         debug!(?account, "Saving created account in local database");
         self.account_database
@@ -154,7 +161,9 @@ mod tests {
                 username,
                 user_identity_verifying_key,
                 challenge_signature,
-                "TODO",
+                "auth_password",
+                Some(b"apns_token".to_vec()),
+                Some(b"gcm_token".to_vec()),
             )
             .await?;
 

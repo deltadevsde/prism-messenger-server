@@ -41,12 +41,19 @@ impl From<RegistrationChallenge> for RequestRegistrationResponse {
     }
 }
 
+#[serde_as]
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FinalizeRegistrationRequest {
     pub username: String,
     pub key: VerifyingKey,
     pub signature: Signature,
+    #[schema(example = "device-token-for-apns")]
+    #[serde_as(as = "Option<Base64>")]
+    pub apns_token: Option<Vec<u8>>,
+    #[schema(example = "device-token-for-gcm")]
+    #[serde_as(as = "Option<Base64>")]
+    pub gcm_token: Option<Vec<u8>>,
 }
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
@@ -105,7 +112,14 @@ async fn post_finalize_registration(
 
     match state
         .registration_service
-        .finalize_registration(req.username, req.key, req.signature, &auth_header.password)
+        .finalize_registration(
+            req.username,
+            req.key,
+            req.signature,
+            &auth_header.password,
+            req.apns_token,
+            req.gcm_token,
+        )
         .await
     {
         Ok(_) => (),
