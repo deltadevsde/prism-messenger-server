@@ -13,7 +13,7 @@ use crate::{
     settings::Settings,
 };
 
-pub struct AppState {
+pub struct AppContext {
     pub account_service: AccountService<PrismHttpClient>,
     pub auth_service: AuthService<InMemoryDatabase>,
     pub key_service: KeyService<PrismHttpClient, InMemoryDatabase>,
@@ -23,8 +23,8 @@ pub struct AppState {
     pub initialization_service: InitializationService<PrismHttpClient>,
 }
 
-impl AppState {
-    /// Creates and initializes the application state, including network setup
+impl AppContext {
+    /// Creates and initializes the application context, including network setup
     pub fn from_settings(settings: &Settings) -> Result<Self> {
         // TODO: Fallback when the file does not exist.
         let signing_key = SigningKey::from_pkcs8_pem_file(&settings.prism.signing_key_path)?;

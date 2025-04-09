@@ -10,19 +10,21 @@ use utoipa::{
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{account, keys, messages, registration, settings::WebserverSettings, state::AppState};
+use crate::{
+    account, context::AppContext, keys, messages, registration, settings::WebserverSettings,
+};
 
 #[derive(OpenApi)]
 struct ApiDoc;
 
-pub async fn start(settings: &WebserverSettings, state: AppState) -> Result<()> {
-    let state_arc = Arc::new(state);
+pub async fn start(settings: &WebserverSettings, context: AppContext) -> Result<()> {
+    let context_arc = Arc::new(context);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/accounts", account::router())
-        .nest("/keys", keys::router(state_arc.clone()))
-        .nest("/messages", messages::router(state_arc.clone()))
+        .nest("/keys", keys::router(context_arc.clone()))
+        .nest("/messages", messages::router(context_arc.clone()))
         .nest("/registration", registration::router())
-        .with_state(state_arc)
+        .with_state(context_arc)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .split_for_parts();

@@ -1,4 +1,5 @@
 mod account;
+mod context;
 mod crypto;
 mod database;
 mod initialization;
@@ -7,12 +8,11 @@ mod messages;
 mod notifications;
 mod registration;
 mod settings;
-mod state;
 mod webserver;
 
 use anyhow::Result;
+use context::AppContext;
 use settings::Settings;
-use state::AppState;
 use std::error::Error;
 use tokio::spawn;
 use tracing::debug;
@@ -28,16 +28,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let settings = Settings::load()?;
-    let app_state = AppState::from_settings(&settings)?;
+    let context = AppContext::from_settings(&settings)?;
 
-    app_state
+    context
         .initialization_service
         .initialize_messenger_server()
         .await?;
 
     let webserver_task_handle = spawn(async move {
         debug!("starting webserver");
-        if let Err(e) = webserver::start(&settings.webserver, app_state).await {
+        if let Err(e) = webserver::start(&settings.webserver, context).await {
             log::error!("Error occurred while running prover: {:?}", e);
         }
     });

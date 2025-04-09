@@ -11,8 +11,8 @@ use uuid::Uuid;
 use super::entities::DoubleRatchetMessage;
 use crate::{
     account::{auth::middleware::require_auth, entities::Account},
+    context::AppContext,
     messages::entities::{Message, MessageReceipt},
-    state::AppState,
 };
 
 const MESSAGING_TAG: &str = "messaging";
@@ -32,12 +32,12 @@ pub struct MarkDeliveredRequest {
     pub message_ids: Vec<Uuid>,
 }
 
-pub fn router(state: Arc<AppState>) -> OpenApiRouter<Arc<AppState>> {
+pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new()
         .routes(routes!(send_message))
         .routes(routes!(fetch_messages))
         .routes(routes!(mark_delivered))
-        .layer(from_fn_with_state(state.clone(), require_auth))
+        .layer(from_fn_with_state(context.clone(), require_auth))
 }
 
 #[utoipa::path(
@@ -51,11 +51,11 @@ pub fn router(state: Arc<AppState>) -> OpenApiRouter<Arc<AppState>> {
     tag = MESSAGING_TAG
 )]
 async fn send_message(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(req): Json<SendMessageRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state
+    context
         .messaging_service
         .send_message(account.username, req.recipient_username, req.message)
         .await
@@ -73,10 +73,10 @@ async fn send_message(
     tag = MESSAGING_TAG
 )]
 async fn fetch_messages(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state
+    context
         .messaging_service
         .get_messages(&account.username)
         .await
@@ -95,11 +95,11 @@ async fn fetch_messages(
     tag = MESSAGING_TAG
 )]
 async fn mark_delivered(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(request): Json<MarkDeliveredRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state
+    context
         .messaging_service
         .mark_delivered(&account.username, request.message_ids)
         .await

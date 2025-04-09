@@ -12,7 +12,7 @@ use std::sync::Arc;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::{account::auth::header::AuthHeader, state::AppState};
+use crate::{account::auth::header::AuthHeader, context::AppContext};
 
 use super::entities::RegistrationChallenge;
 
@@ -56,7 +56,7 @@ pub struct FinalizeRegistrationRequest {
     pub gcm_token: Option<Vec<u8>>,
 }
 
-pub fn router() -> OpenApiRouter<Arc<AppState>> {
+pub fn router() -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new()
         .routes(routes!(post_request_registration))
         .routes(routes!(post_finalize_registration))
@@ -73,10 +73,10 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
     tag = REGISTRATION_TAG
 )]
 async fn post_request_registration(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Json(req): Json<RequestRegistrationRequest>,
 ) -> Result<Json<RequestRegistrationResponse>, StatusCode> {
-    let challenge = state
+    let challenge = context
         .registration_service
         .request_registration(req.username, req.key)
         .await?;
@@ -94,7 +94,7 @@ async fn post_request_registration(
     tag = REGISTRATION_TAG
 )]
 async fn post_finalize_registration(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     headers: HeaderMap,
     Json(req): Json<FinalizeRegistrationRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -110,7 +110,7 @@ async fn post_finalize_registration(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    match state
+    match context
         .registration_service
         .finalize_registration(
             req.username,

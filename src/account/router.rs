@@ -5,11 +5,11 @@ use axum::{
 use std::sync::Arc;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::state::AppState;
+use crate::context::AppContext;
 
 const ACCOUNTS_TAG: &str = "accounts";
 
-pub fn router() -> OpenApiRouter<Arc<AppState>> {
+pub fn router() -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new().routes(routes!(head_account))
 }
 
@@ -26,9 +26,9 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
 )]
 async fn head_account(
     Path(username): Path<String>,
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
 ) -> StatusCode {
-    let Ok(username_exists) = state.account_service.username_exists(&username).await else {
+    let Ok(username_exists) = context.account_service.username_exists(&username).await else {
         return StatusCode::INTERNAL_SERVER_ERROR;
     };
 
