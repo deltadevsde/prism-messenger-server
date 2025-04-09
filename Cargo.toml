@@ -28,12 +28,7 @@ utoipa-axum = { version = "0.2.0" }
 argon2 = "0.5.3"
 
 # Prism
-prism-prover = { path = "../prism/crates/node_types/prover", features = [
-    "mock_prover",
-] }
 prism-client = { path = "../prism/crates/client", features = ["mockall"] }
-prism-da = { path = "../prism/crates/da" }
-prism-storage = { path = "../prism/crates/storage" }
 keystore-rs = { version = "0.3" }
 
 # Errors
