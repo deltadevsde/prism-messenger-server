@@ -86,7 +86,7 @@ where
         debug!(?account, "Saving created account in local database");
         self.account_database
             .clone()
-            .insert_or_update(account)
+            .upsert_account(account)
             .await?;
 
         info!("Registration completed successfully");
@@ -118,7 +118,7 @@ mod tests {
         let user_identity_verifying_key = user_identity_signing_key.verifying_key();
 
         mock_account_db
-            .expect_insert_or_update()
+            .expect_upsert_account()
             .times(1)
             .returning(|_| Ok(()));
 
