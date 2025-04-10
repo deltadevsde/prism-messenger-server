@@ -20,7 +20,7 @@ struct ApiDoc;
 pub async fn start(settings: &WebserverSettings, context: AppContext) -> Result<()> {
     let context_arc = Arc::new(context);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest("/accounts", account::router())
+        .nest("/accounts", account::router(context_arc.clone()))
         .nest("/keys", keys::router(context_arc.clone()))
         .nest("/messages", messages::router(context_arc.clone()))
         .nest("/registration", registration::router())

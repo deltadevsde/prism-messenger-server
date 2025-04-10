@@ -22,4 +22,5 @@ pub trait AccountDatabase {
         username: &str,
     ) -> Result<Account, AccountDatabaseError>;
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError>;
+    async fn update_apns_token(&self, id: Uuid, token: Vec<u8>) -> Result<(), AccountDatabaseError>;
 }

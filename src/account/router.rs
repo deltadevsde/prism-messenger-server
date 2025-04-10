@@ -1,16 +1,39 @@
 use axum::{
+    Extension, Json,
     extract::{Path, State},
     http::StatusCode,
+    middleware::from_fn_with_state,
+    response::IntoResponse,
 };
+use serde::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use std::sync::Arc;
+use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+use crate::account::entities::Account;
 use crate::context::AppContext;
+
+use super::auth::middleware::require_auth;
 
 const ACCOUNTS_TAG: &str = "accounts";
 
-pub fn router() -> OpenApiRouter<Arc<AppContext>> {
-    OpenApiRouter::new().routes(routes!(head_account))
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ApnsTokenUpdateRequest {
+    /// The new APNS token
+    #[schema(example = "dGhpcyBpcyBub3QgYSByZWFsIEFQTlMgdG9rZW4=")]
+    #[serde_as(as = "Base64")]
+    pub token: Vec<u8>,
+}
+
+pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
+    let public_router = OpenApiRouter::new().routes(routes!(head_account));
+    let auth_router = OpenApiRouter::new()
+        .routes(routes!(update_apns_token))
+        .layer(from_fn_with_state(context.clone(), require_auth));
+
+    public_router.merge(auth_router)
 }
 
 #[utoipa::path(
@@ -36,4 +59,30 @@ async fn head_account(
         true => StatusCode::OK,
         false => StatusCode::NOT_FOUND,
     }
+}
+
+#[utoipa::path(
+    put,
+    path = "/apns",
+    tag = ACCOUNTS_TAG,
+    request_body = ApnsTokenUpdateRequest,
+    security(
+        ("basic_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "APNS token updated successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Failed to update APNS token")
+    )
+)]
+async fn update_apns_token(
+    Extension(account): Extension<Account>,
+    State(context): State<Arc<AppContext>>,
+    Json(request): Json<ApnsTokenUpdateRequest>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    context
+        .account_service
+        .update_apns_token(account.id, request.token)
+        .await
+        .map(|_| StatusCode::OK)
 }

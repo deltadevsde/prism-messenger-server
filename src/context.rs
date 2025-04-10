@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub struct AppContext {
-    pub account_service: AccountService<PrismHttpClient>,
+    pub account_service: AccountService<PrismHttpClient, InMemoryDatabase>,
     pub auth_service: AuthService<InMemoryDatabase>,
     pub key_service: KeyService<PrismHttpClient, InMemoryDatabase>,
     pub messaging_service:
@@ -47,7 +47,7 @@ impl AppContext {
         )?;
         let apns_gateway_arc = Arc::new(apns_gateway);
 
-        let account_service = AccountService::new(prism_arc.clone());
+        let account_service = AccountService::new(prism_arc.clone(), db.clone());
         let auth_service = AuthService::new(db.clone());
         let registration_service =
             RegistrationService::new(prism_arc.clone(), db.clone(), signing_key.clone());

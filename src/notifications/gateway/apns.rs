@@ -4,6 +4,7 @@ use a2::{
 };
 use async_trait::async_trait;
 use std::{fs::File, io::Read, path::Path};
+use tracing::instrument;
 
 use super::{NotificationError, NotificationGateway};
 
@@ -58,6 +59,7 @@ impl ApnsNotificationGateway {
 
 #[async_trait]
 impl NotificationGateway for ApnsNotificationGateway {
+    #[instrument(skip_all)]
     async fn send_silent_notification(&self, device_token: &[u8]) -> Result<(), NotificationError> {
         let options = NotificationOptions {
             apns_topic: Some(&self.bundle_id),
@@ -67,10 +69,9 @@ impl NotificationGateway for ApnsNotificationGateway {
         let device_token_hex = hex::encode(device_token);
 
         let payload = DefaultNotificationBuilder::new().build(&device_token_hex, options);
-        // payload.add_custom_data("custom_data", &whatever)?;
 
         let response = self.client.send(payload).await?;
-        println!("Sent: {:?}", response);
+        tracing::debug!("APNS response: {:?}", response);
         Ok(())
     }
 }
