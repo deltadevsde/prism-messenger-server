@@ -15,6 +15,10 @@ pub struct SaltedHash {
 }
 
 impl SaltedHash {
+    pub fn new(hash: String) -> Self {
+        Self { hash }
+    }
+
     pub fn generate_from(password: &str) -> Self {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
@@ -31,6 +35,32 @@ impl SaltedHash {
         let parsed_hash = PasswordHash::new(&self.hash)?;
         Argon2::default().verify_password(password.as_bytes(), &parsed_hash)?;
         Ok(())
+    }
+}
+
+impl TryFrom<String> for SaltedHash {
+    type Error = SaltedHashError;
+
+    fn try_from(hash: String) -> Result<Self, Self::Error> {
+        // Verify the hash is valid by parsing it
+        PasswordHash::new(&hash)
+            .map_err(|e| SaltedHashError::HashParseError(format!("{:?}", e)))?;
+
+        Ok(Self::new(hash))
+    }
+}
+
+impl TryFrom<&str> for SaltedHash {
+    type Error = SaltedHashError;
+
+    fn try_from(hash: &str) -> Result<Self, Self::Error> {
+        Self::try_from(hash.to_string())
+    }
+}
+
+impl AsRef<str> for SaltedHash {
+    fn as_ref(&self) -> &str {
+        &self.hash
     }
 }
 
