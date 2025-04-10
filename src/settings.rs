@@ -22,6 +22,13 @@ pub struct ApnsSettings {
     pub private_key_path: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseSettings {
+    Sqlite { path: String },
+}
+
 // TODO: Defaults for these settings?
 #[derive(Debug, Clone, Deserialize)]
 pub struct Settings {
@@ -29,6 +36,7 @@ pub struct Settings {
     pub webserver: WebserverSettings,
     pub prism: PrismSettings,
     pub apns: ApnsSettings,
+    pub database: DatabaseSettings,
 }
 
 impl Settings {
