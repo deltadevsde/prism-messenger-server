@@ -14,3 +14,7 @@ team_id = "T1E234A5M"
 key_id = "K12E34Y56"
 private_key_path = "~/.prism/AuthKey_K12E34Y56.p8"
 bundle_id = "com.whatever.PrismMessenger"
+
+[database]
+type = "sqlite"
+path = "~/.prism/prism_messenger.sqlite"
