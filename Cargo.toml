@@ -24,6 +24,15 @@ utoipa = { version = "5.3", features = ["axum_extras", "uuid"] }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-axum = { version = "0.2.0" }
 
+# Database
+sqlx = { version = "0.7", features = [
+    "runtime-tokio",
+    "sqlite",
+    "uuid",
+    "time",
+    "macros",
+] }
+
 # Crypto
 argon2 = "0.5.3"
 
