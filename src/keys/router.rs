@@ -55,13 +55,12 @@ async fn post_keybundle(
     State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(req): Json<UploadKeyBundleRequest>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<StatusCode, impl IntoResponse> {
     context
         .key_service
         .upload_key_bundle(&account.username, req.key_bundle)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(())
+        .await
+        .map(|_| StatusCode::OK)
 }
 
 #[utoipa::path(
@@ -78,13 +77,12 @@ async fn post_prekeys(
     State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(req): Json<UploadPrekeysRequest>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<StatusCode, impl IntoResponse> {
     context
         .key_service
         .add_prekeys(&account.username, req.prekeys)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(())
+        .await
+        .map(|_| StatusCode::OK)
 }
 
 #[utoipa::path(
