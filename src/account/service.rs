@@ -62,10 +62,11 @@ impl<P: PrismApi, D: AccountDatabase> AccountService<P, D> {
 mod tests {
     use std::sync::Arc;
 
-    use crate::account::database::MockAccountDatabase;
-    use crate::account::service::AccountService;
+    use crate::account::database::{AccountDatabaseError, MockAccountDatabase};
+    use crate::account::service::{AccountService, AccountServiceError};
     use mockall::predicate::eq;
     use prism_client::{Account, AccountResponse, HashedMerkleProof, mock::MockPrismApi};
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_username_exists_returns_true_when_found() {
@@ -104,5 +105,65 @@ mod tests {
         let service = AccountService::new(Arc::new(mock_client), Arc::new(mock_db));
         let exists = service.username_exists("test").await.unwrap();
         assert!(!exists);
+    }
+
+    #[tokio::test]
+    async fn test_update_apns_token_success() {
+        let mock_client = MockPrismApi::new();
+        let mut mock_db = MockAccountDatabase::new();
+
+        let account_id = Uuid::new_v4();
+        let token = vec![1, 2, 3, 4, 5];
+
+        mock_db
+            .expect_update_apns_token()
+            .once()
+            .with(eq(account_id), eq(token.clone()))
+            .returning(|_, _| Ok(()));
+
+        let service = AccountService::new(Arc::new(mock_client), Arc::new(mock_db));
+        let result = service.update_apns_token(account_id, token).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_apns_token_account_not_found() {
+        let mock_client = MockPrismApi::new();
+        let mut mock_db = MockAccountDatabase::new();
+
+        let account_id = Uuid::new_v4();
+        let token = vec![1, 2, 3, 4, 5];
+
+        mock_db
+            .expect_update_apns_token()
+            .once()
+            .with(eq(account_id), eq(token.clone()))
+            .returning(|id, _| Err(AccountDatabaseError::NotFound(id)));
+
+        let service = AccountService::new(Arc::new(mock_client), Arc::new(mock_db));
+        let result = service.update_apns_token(account_id, token).await;
+
+        assert!(matches!(result, Err(AccountServiceError::AccountNotFound)));
+    }
+
+    #[tokio::test]
+    async fn test_update_apns_token_database_error() {
+        let mock_client = MockPrismApi::new();
+        let mut mock_db = MockAccountDatabase::new();
+
+        let account_id = Uuid::new_v4();
+        let token = vec![1, 2, 3, 4, 5];
+
+        mock_db
+            .expect_update_apns_token()
+            .once()
+            .with(eq(account_id), eq(token.clone()))
+            .returning(|_, _| Err(AccountDatabaseError::OperationFailed));
+
+        let service = AccountService::new(Arc::new(mock_client), Arc::new(mock_db));
+        let result = service.update_apns_token(account_id, token).await;
+
+        assert!(matches!(result, Err(AccountServiceError::DatabaseError(_))));
     }
 }
