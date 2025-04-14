@@ -30,7 +30,10 @@ impl From<AccountDatabaseError> for RegistrationError {
 }
 
 impl From<RegistrationError> for StatusCode {
-    fn from(_: RegistrationError) -> Self {
-        StatusCode::INTERNAL_SERVER_ERROR
+    fn from(err: RegistrationError) -> Self {
+        match err {
+            RegistrationError::MissingPushToken => StatusCode::BAD_REQUEST,
+            RegistrationError::ProcessingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
     }
 }
