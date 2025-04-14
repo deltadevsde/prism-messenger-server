@@ -111,7 +111,8 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{
-        account::database::MockAccountDatabase, registration::service::RegistrationService,
+        account::database::MockAccountDatabase,
+        registration::{error::RegistrationError, service::RegistrationService},
     };
 
     #[tokio::test]
@@ -166,6 +167,117 @@ mod tests {
                 Some(b"gcm_token".to_vec()),
             )
             .await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_push_tokens_validation() -> Result<()> {
+        // Setup test components
+        let mut mock_prism = MockPrismApi::new();
+        let mut mock_account_db = MockAccountDatabase::new();
+        let service_signing_key = SigningKey::new_ed25519();
+
+        let username = "push_token_test_user".to_string();
+        let user_signing_key = SigningKey::new_secp256r1();
+        let user_verifying_key = user_signing_key.verifying_key();
+
+        mock_prism.expect_post_transaction().returning(|_| {
+            Ok(MockPrismPendingTransaction::with_result(Ok(
+                Account::default(),
+            )))
+        });
+
+        mock_account_db
+            .expect_upsert_account()
+            .returning(|_| Ok(()));
+
+        // Create the service
+        let service = RegistrationService::new(
+            Arc::new(mock_prism),
+            Arc::new(mock_account_db),
+            service_signing_key.clone(),
+        );
+
+        // Request registration to get challenge
+        let registration_challenge = service
+            .request_registration(username.clone(), user_verifying_key.clone())
+            .await?;
+
+        // Sign the challenge
+        let challenge_signature = user_signing_key.sign(registration_challenge).unwrap();
+
+        // Case 1: Test with no push tokens (should fail)
+        let result = service
+            .finalize_registration(
+                username.clone(),
+                user_verifying_key.clone(),
+                challenge_signature.clone(),
+                "auth_password",
+                None,
+                None,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Registration should fail with no push tokens"
+        );
+        assert!(
+            matches!(result.unwrap_err(), RegistrationError::MissingPushToken),
+            "Expected MissingPushToken error"
+        );
+
+        // Case 2: Test with only APNS token
+        let result = service
+            .finalize_registration(
+                username.clone(),
+                user_verifying_key.clone(),
+                challenge_signature.clone(),
+                "auth_password",
+                Some(b"apns_token".to_vec()),
+                None,
+            )
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Registration should succeed with only APNS token"
+        );
+
+        // Case 3: Test with only GCM token
+        let result = service
+            .finalize_registration(
+                username.clone(),
+                user_verifying_key.clone(),
+                challenge_signature.clone(),
+                "auth_password",
+                None,
+                Some(b"gcm_token".to_vec()),
+            )
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Registration should succeed with only GCM token"
+        );
+
+        // Case 4: Test with both tokens
+        let result = service
+            .finalize_registration(
+                username,
+                user_verifying_key,
+                challenge_signature,
+                "auth_password",
+                Some(b"apns_token".to_vec()),
+                Some(b"gcm_token".to_vec()),
+            )
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Registration should succeed with both tokens"
+        );
 
         Ok(())
     }
