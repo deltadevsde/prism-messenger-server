@@ -16,7 +16,7 @@ use crate::{
 pub struct AppContext {
     pub account_service: AccountService<PrismHttpClient, SqliteDatabase>,
     pub auth_service: AuthService<SqliteDatabase>,
-    pub key_service: KeyService<PrismHttpClient, InMemoryDatabase>,
+    pub key_service: KeyService<PrismHttpClient, SqliteDatabase>,
     pub messaging_service:
         MessagingService<SqliteDatabase, InMemoryDatabase, ApnsNotificationGateway>,
     pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase>,
@@ -58,7 +58,7 @@ impl AppContext {
         let auth_service = AuthService::new(sqlite_db.clone());
         let registration_service =
             RegistrationService::new(prism_arc.clone(), sqlite_db.clone(), signing_key.clone());
-        let key_service = KeyService::new(prism_arc.clone(), in_memory_db.clone());
+        let key_service = KeyService::new(prism_arc.clone(), sqlite_db.clone());
         let messaging_service =
             MessagingService::new(sqlite_db.clone(), in_memory_db.clone(), apns_gateway_arc);
         let initialization_service = InitializationService::new(prism_arc.clone(), signing_key);
