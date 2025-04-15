@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let settings = Settings::load()?;
-    let context = AppContext::from_settings(&settings)?;
+    let context = AppContext::from_settings(&settings).await?;
 
     context
         .initialization_service

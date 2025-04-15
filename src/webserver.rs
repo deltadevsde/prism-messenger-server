@@ -11,7 +11,10 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    account, context::AppContext, keys, messages, registration, settings::WebserverSettings,
+    account, 
+    context::AppContext,
+    keys, messages, registration, 
+    settings::WebserverSettings,
 };
 
 #[derive(OpenApi)]

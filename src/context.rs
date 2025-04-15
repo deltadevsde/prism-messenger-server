@@ -1,31 +1,31 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use prism_client::{PrismHttpClient, SigningKey};
 use std::{path::Path, sync::Arc};
 
 use crate::{
     account::{auth::service::AuthService, service::AccountService},
-    database::inmemory::InMemoryDatabase,
+    database::{inmemory::InMemoryDatabase, pool::create_sqlite_pool, sqlite::SqliteDatabase},
     initialization::InitializationService,
     keys::service::KeyService,
     messages::service::MessagingService,
     notifications::gateway::apns::ApnsNotificationGateway,
     registration::service::RegistrationService,
-    settings::Settings,
+    settings::{DatabaseSettings, Settings},
 };
 
 pub struct AppContext {
-    pub account_service: AccountService<PrismHttpClient, InMemoryDatabase>,
-    pub auth_service: AuthService<InMemoryDatabase>,
+    pub account_service: AccountService<PrismHttpClient, SqliteDatabase>,
+    pub auth_service: AuthService<SqliteDatabase>,
     pub key_service: KeyService<PrismHttpClient, InMemoryDatabase>,
     pub messaging_service:
-        MessagingService<InMemoryDatabase, InMemoryDatabase, ApnsNotificationGateway>,
-    pub registration_service: RegistrationService<PrismHttpClient, InMemoryDatabase>,
+        MessagingService<SqliteDatabase, InMemoryDatabase, ApnsNotificationGateway>,
+    pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase>,
     pub initialization_service: InitializationService<PrismHttpClient>,
 }
 
 impl AppContext {
     /// Creates and initializes the application context, including network setup
-    pub fn from_settings(settings: &Settings) -> Result<Self> {
+    pub async fn from_settings(settings: &Settings) -> Result<Self> {
         let signing_key = Self::read_or_create_signing_key(&settings.prism.signing_key_path)?;
 
         // Initialize prism client
@@ -34,7 +34,7 @@ impl AppContext {
         )?;
         let prism_arc = Arc::new(prism);
 
-        let db = Arc::new(InMemoryDatabase::new());
+        let in_memory_db = Arc::new(InMemoryDatabase::new());
 
         // Notifications
         let apns_gateway = ApnsNotificationGateway::from_file(
@@ -46,12 +46,21 @@ impl AppContext {
         )?;
         let apns_gateway_arc = Arc::new(apns_gateway);
 
-        let account_service = AccountService::new(prism_arc.clone(), db.clone());
-        let auth_service = AuthService::new(db.clone());
+        let DatabaseSettings::Sqlite { path } = &settings.database else {
+            bail!("Unsupported database type");
+        };
+
+        let db_pool = create_sqlite_pool(path).await?;
+        let sqlite_db = Arc::new(SqliteDatabase::new(db_pool));
+        sqlite_db.init().await?;
+
+        let account_service = AccountService::new(prism_arc.clone(), sqlite_db.clone());
+        let auth_service = AuthService::new(sqlite_db.clone());
         let registration_service =
-            RegistrationService::new(prism_arc.clone(), db.clone(), signing_key.clone());
-        let key_service = KeyService::new(prism_arc.clone(), db.clone());
-        let messaging_service = MessagingService::new(db.clone(), db.clone(), apns_gateway_arc);
+            RegistrationService::new(prism_arc.clone(), sqlite_db.clone(), signing_key.clone());
+        let key_service = KeyService::new(prism_arc.clone(), in_memory_db.clone());
+        let messaging_service =
+            MessagingService::new(sqlite_db.clone(), in_memory_db.clone(), apns_gateway_arc);
         let initialization_service = InitializationService::new(prism_arc.clone(), signing_key);
 
         Ok(Self {

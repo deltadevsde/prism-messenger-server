@@ -139,7 +139,7 @@ mod tests {
             .expect_update_apns_token()
             .once()
             .with(eq(account_id), eq(token.clone()))
-            .returning(|id, _| Err(AccountDatabaseError::NotFound(id)));
+            .returning(|id, _| Err(AccountDatabaseError::NotFound(id.to_string())));
 
         let service = AccountService::new(Arc::new(mock_client), Arc::new(mock_db));
         let result = service.update_apns_token(account_id, token).await;

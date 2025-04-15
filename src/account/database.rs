@@ -9,7 +9,7 @@ pub enum AccountDatabaseError {
     #[error("Database operation failed")]
     OperationFailed,
     #[error("Account not found: {0}")]
-    NotFound(Uuid),
+    NotFound(String),
 }
 
 #[cfg_attr(test, automock)]
@@ -22,5 +22,6 @@ pub trait AccountDatabase {
         username: &str,
     ) -> Result<Account, AccountDatabaseError>;
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError>;
-    async fn update_apns_token(&self, id: Uuid, token: Vec<u8>) -> Result<(), AccountDatabaseError>;
+    async fn update_apns_token(&self, id: Uuid, token: Vec<u8>)
+    -> Result<(), AccountDatabaseError>;
 }

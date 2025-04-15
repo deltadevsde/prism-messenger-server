@@ -53,7 +53,7 @@ impl AccountDatabase for InMemoryDatabase {
         account_lock
             .get(&id)
             .cloned()
-            .ok_or(AccountDatabaseError::NotFound(id))
+            .ok_or(AccountDatabaseError::NotFound(id.to_string()))
     }
 
     async fn fetch_account_by_username(
@@ -94,7 +94,7 @@ impl AccountDatabase for InMemoryDatabase {
 
         let account = account_lock
             .get_mut(&id)
-            .ok_or(AccountDatabaseError::NotFound(id))?;
+            .ok_or(AccountDatabaseError::NotFound(id.to_string()))?;
 
         account.apns_token = Some(token);
         Ok(())
