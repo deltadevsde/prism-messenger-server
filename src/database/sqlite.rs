@@ -171,7 +171,7 @@ impl AccountDatabase for SqliteDatabase {
         id: Uuid,
         token: Vec<u8>,
     ) -> Result<(), AccountDatabaseError> {
-        sqlx::query(
+        let result = sqlx::query(
             r#"
             UPDATE accounts
             SET apns_token = ?
@@ -184,21 +184,7 @@ impl AccountDatabase for SqliteDatabase {
         .await
         .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-        // Check if the update affected any rows
-        let rows_affected = sqlx::query(
-            r#"
-            SELECT changes() as rows_affected
-            "#,
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|_| AccountDatabaseError::OperationFailed)?;
-
-        let affected: i64 = rows_affected
-            .try_get("rows_affected")
-            .map_err(|_| AccountDatabaseError::OperationFailed)?;
-
-        if affected == 0 {
+        if result.rows_affected() == 0 {
             return Err(AccountDatabaseError::NotFound(id));
         }
 
