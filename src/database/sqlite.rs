@@ -393,6 +393,7 @@ impl From<sqlx::Error> for KeyError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prism_client::SigningKey;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn create_test_pool() -> SqlitePool {
@@ -487,12 +488,113 @@ mod tests {
         }
     }
 
-    // Skipping key database test as it requires mocking prism_client types
     #[tokio::test]
-    #[ignore]
     async fn test_key_database_operations() {
-        // This test requires actual implementation details for the prism_client types
-        // which would need to be mocked for proper testing
-        // Test has been disabled with #[ignore]
+        let pool = create_test_pool().await;
+        let db = SqliteDatabase::new(pool);
+        db.init().await.expect("Failed to initialize database");
+
+        let username = "keyuser";
+
+        // Create a test key bundle
+        let identity_signing_key = SigningKey::new_ed25519();
+        let identity_key = identity_signing_key.verifying_key();
+        let signed_prekey = SigningKey::new_ed25519().verifying_key();
+        let signed_prekey_signature = identity_signing_key
+            .sign(signed_prekey.to_spki_der().unwrap())
+            .unwrap();
+        let prekey1 = Prekey {
+            key_idx: 1,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+        let prekey2 = Prekey {
+            key_idx: 2,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+
+        let key_bundle = KeyBundle {
+            identity_key: identity_key.clone(),
+            signed_prekey: signed_prekey.clone(),
+            signed_prekey_signature: signed_prekey_signature.clone(),
+            prekeys: vec![prekey1.clone(), prekey2.clone()],
+        };
+
+        // Test inserting a key bundle
+        db.insert_keybundle(username, key_bundle)
+            .await
+            .expect("Failed to insert key bundle");
+
+        // Test retrieving the key bundle
+        let retrieved_bundle = db
+            .get_keybundle(username)
+            .await
+            .expect("Failed to get key bundle")
+            .expect("Key bundle should exist");
+
+        // Directly compare the cryptographic types
+        assert_eq!(&retrieved_bundle.identity_key, &identity_key);
+        assert_eq!(retrieved_bundle.signed_prekey, signed_prekey);
+        assert_eq!(
+            retrieved_bundle.signed_prekey_signature,
+            signed_prekey_signature
+        );
+        assert_eq!(retrieved_bundle.prekeys.len(), 2);
+        assert_eq!(retrieved_bundle.prekeys[0], prekey1);
+        assert_eq!(retrieved_bundle.prekeys[1], prekey2);
+
+        // Test adding additional prekeys
+        let prekey3 = Prekey {
+            key_idx: 3,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+        let prekey4 = Prekey {
+            key_idx: 4,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+
+        let additional_prekeys = vec![prekey3.clone(), prekey4.clone()];
+
+        db.add_prekeys(username, additional_prekeys)
+            .await
+            .expect("Failed to add prekeys");
+
+        // Verify the updated bundle has all prekeys
+        let updated_bundle = db
+            .get_keybundle(username)
+            .await
+            .expect("Failed to get updated key bundle")
+            .expect("Updated key bundle should exist");
+
+        // Check the number of prekeys
+        assert_eq!(updated_bundle.prekeys.len(), 4);
+        assert_eq!(updated_bundle.prekeys[2], prekey3);
+        assert_eq!(updated_bundle.prekeys[3], prekey4);
+
+        // Test adding prekeys for non-existent user
+        let non_existent_user = "nonexistentuser";
+        let result = db
+            .add_prekeys(
+                non_existent_user,
+                vec![Prekey {
+                    key_idx: 1,
+                    key: SigningKey::new_ed25519().verifying_key(),
+                }],
+            )
+            .await;
+
+        assert!(result.is_err());
+        if let Err(KeyError::NotFound(user)) = result {
+            assert_eq!(user, non_existent_user);
+        } else {
+            panic!("Expected KeyError::NotFound");
+        }
+
+        // Test getting a non-existent key bundle
+        let non_existent_bundle = db
+            .get_keybundle(non_existent_user)
+            .await
+            .expect("get_keybundle should not fail for non-existent user");
+
+        assert!(non_existent_bundle.is_none(), "Bundle should not exist");
     }
 }
