@@ -27,7 +27,7 @@ impl<D: AccountDatabase> AuthService<D> {
         // Look up the account by username
         let account = self
             .account_db
-            .fetch_by_username(username)
+            .fetch_account_by_username(username)
             .await
             .map_err(|_| AuthError::InvalidCredentials)?;
 

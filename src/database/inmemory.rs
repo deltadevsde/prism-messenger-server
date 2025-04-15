@@ -34,7 +34,7 @@ impl InMemoryDatabase {
 
 #[async_trait]
 impl AccountDatabase for InMemoryDatabase {
-    async fn insert_or_update(&self, account: Account) -> Result<(), AccountDatabaseError> {
+    async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError> {
         let mut account_lock = self
             .accounts
             .lock()
@@ -44,7 +44,7 @@ impl AccountDatabase for InMemoryDatabase {
         Ok(())
     }
 
-    async fn fetch(&self, id: Uuid) -> Result<Account, AccountDatabaseError> {
+    async fn fetch_account(&self, id: Uuid) -> Result<Account, AccountDatabaseError> {
         let account_lock = self
             .accounts
             .lock()
@@ -56,7 +56,10 @@ impl AccountDatabase for InMemoryDatabase {
             .ok_or(AccountDatabaseError::NotFound(id))
     }
 
-    async fn fetch_by_username(&self, username: &str) -> Result<Account, AccountDatabaseError> {
+    async fn fetch_account_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Account, AccountDatabaseError> {
         let account_lock = self
             .accounts
             .lock()
@@ -69,13 +72,31 @@ impl AccountDatabase for InMemoryDatabase {
             .ok_or(AccountDatabaseError::OperationFailed)
     }
 
-    async fn remove(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
+    async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
         let mut account_lock = self
             .accounts
             .lock()
             .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
         account_lock.remove(&id);
+        Ok(())
+    }
+
+    async fn update_apns_token(
+        &self,
+        id: Uuid,
+        token: Vec<u8>,
+    ) -> Result<(), AccountDatabaseError> {
+        let mut account_lock = self
+            .accounts
+            .lock()
+            .map_err(|_| AccountDatabaseError::OperationFailed)?;
+
+        let account = account_lock
+            .get_mut(&id)
+            .ok_or(AccountDatabaseError::NotFound(id))?;
+
+        account.apns_token = Some(token);
         Ok(())
     }
 }
@@ -115,6 +136,7 @@ impl KeyDatabase for InMemoryDatabase {
     }
 }
 
+#[async_trait]
 impl MessageDatabase for InMemoryDatabase {
     fn insert_message(&self, message: Message) -> Result<bool> {
         let mut messages_lock = self

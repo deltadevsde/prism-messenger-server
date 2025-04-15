@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{
     account::{auth::middleware::require_auth, entities::Account},
-    state::AppState,
+    context::AppContext,
 };
 
 const KEY_TAG: &str = "keys";
@@ -33,12 +33,12 @@ pub struct UploadPrekeysRequest {
     pub prekeys: Vec<Prekey>,
 }
 
-pub fn router(state: Arc<AppState>) -> OpenApiRouter<Arc<AppState>> {
+pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new()
         .routes(routes!(post_keybundle))
         .routes(routes!(get_keybundle))
         .routes(routes!(post_prekeys))
-        .layer(from_fn_with_state(state.clone(), require_auth))
+        .layer(from_fn_with_state(context.clone(), require_auth))
 }
 
 #[utoipa::path(
@@ -52,11 +52,11 @@ pub fn router(state: Arc<AppState>) -> OpenApiRouter<Arc<AppState>> {
     tag = KEY_TAG
 )]
 async fn post_keybundle(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(req): Json<UploadKeyBundleRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state
+    context
         .key_service
         .upload_key_bundle(&account.username, req.key_bundle)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -75,11 +75,11 @@ async fn post_keybundle(
     tag = KEY_TAG
 )]
 async fn post_prekeys(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(req): Json<UploadPrekeysRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state
+    context
         .key_service
         .add_prekeys(&account.username, req.prekeys)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -100,10 +100,10 @@ async fn post_prekeys(
     tag = KEY_TAG
 )]
 async fn get_keybundle(
-    State(state): State<Arc<AppState>>,
+    State(context): State<Arc<AppContext>>,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    state
+    context
         .key_service
         .get_keybundle(&username)
         .await

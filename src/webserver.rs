@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use log::info;
-use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -11,34 +10,21 @@ use utoipa::{
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{account, keys, messages, registration, state::AppState};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WebServerConfig {
-    pub host: String,
-    pub port: u16,
-}
-
-impl Default for WebServerConfig {
-    fn default() -> Self {
-        WebServerConfig {
-            host: "127.0.0.1".to_string(),
-            port: 0,
-        }
-    }
-}
+use crate::{
+    account, context::AppContext, keys, messages, registration, settings::WebserverSettings,
+};
 
 #[derive(OpenApi)]
 struct ApiDoc;
 
-pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
-    let state_arc = Arc::new(state);
+pub async fn start(settings: &WebserverSettings, context: AppContext) -> Result<()> {
+    let context_arc = Arc::new(context);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest("/accounts", account::router())
-        .nest("/keys", keys::router(state_arc.clone()))
-        .nest("/messages", messages::router(state_arc.clone()))
+        .nest("/accounts", account::router(context_arc.clone()))
+        .nest("/keys", keys::router(context_arc.clone()))
+        .nest("/messages", messages::router(context_arc.clone()))
         .nest("/registration", registration::router())
-        .with_state(state_arc)
+        .with_state(context_arc)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .split_for_parts();
@@ -50,8 +36,8 @@ pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
     let router = router.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api));
 
     let addr = SocketAddr::new(
-        config.host.parse().expect("IP address can be parsed"),
-        config.port,
+        settings.host.parse().expect("IP address can be parsed"),
+        settings.port,
     );
     let listener = TcpListener::bind(addr)
         .await
@@ -61,7 +47,7 @@ pub async fn start(config: &WebServerConfig, state: AppState) -> Result<()> {
     let socket_addr = server.local_addr()?;
     info!(
         "Starting webserver on {}:{}",
-        config.host,
+        settings.host,
         socket_addr.port()
     );
 
