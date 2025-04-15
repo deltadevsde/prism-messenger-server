@@ -1,6 +1,6 @@
 use a2::{
     Client, ClientConfig, DefaultNotificationBuilder, Endpoint, Error as A2Error,
-    NotificationBuilder, NotificationOptions, Priority,
+    NotificationBuilder, NotificationOptions, Priority, PushType,
 };
 use async_trait::async_trait;
 use std::{fs::File, io::Read, path::Path};
@@ -63,12 +63,15 @@ impl NotificationGateway for ApnsNotificationGateway {
     async fn send_silent_notification(&self, device_token: &[u8]) -> Result<(), NotificationError> {
         let options = NotificationOptions {
             apns_topic: Some(&self.bundle_id),
-            apns_priority: Some(Priority::Normal),
+            apns_push_type: Some(PushType::Background),
+            apns_priority: Some(Priority::High),
             ..Default::default()
         };
         let device_token_hex = hex::encode(device_token);
 
-        let payload = DefaultNotificationBuilder::new().build(&device_token_hex, options);
+        let payload = DefaultNotificationBuilder::new()
+            .set_content_available()
+            .build(&device_token_hex, options);
 
         let response = self.client.send(payload).await?;
         tracing::debug!("APNS response: {:?}", response);
