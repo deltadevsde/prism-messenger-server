@@ -1,6 +1,6 @@
 use anyhow::Result;
 use prism_client::{PrismHttpClient, SigningKey};
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use crate::{
     account::{auth::service::AuthService, service::AccountService},
@@ -26,8 +26,7 @@ pub struct AppContext {
 impl AppContext {
     /// Creates and initializes the application context, including network setup
     pub fn from_settings(settings: &Settings) -> Result<Self> {
-        // TODO: Fallback when the file does not exist.
-        let signing_key = SigningKey::from_pkcs8_pem_file(&settings.prism.signing_key_path)?;
+        let signing_key = Self::read_or_create_signing_key(&settings.prism.signing_key_path)?;
 
         // Initialize prism client
         let prism = PrismHttpClient::new(
@@ -63,5 +62,16 @@ impl AppContext {
             messaging_service,
             initialization_service,
         })
+    }
+
+    /// Gets the signing key from file or creates a new one if the file doesn't exist
+    fn read_or_create_signing_key(path: impl AsRef<Path>) -> Result<SigningKey> {
+        if path.as_ref().exists() {
+            Ok(SigningKey::from_pkcs8_pem_file(path)?)
+        } else {
+            let key = SigningKey::new_ed25519();
+            key.to_pkcs8_pem_file(path)?;
+            Ok(key)
+        }
     }
 }
