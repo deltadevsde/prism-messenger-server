@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -12,6 +12,7 @@ use crate::{
     keys::{
         database::KeyDatabase,
         entities::{KeyBundle, Prekey},
+        error::KeyError,
     },
     messages::{database::MessageDatabase, entities::Message},
 };
@@ -101,44 +102,48 @@ impl AccountDatabase for InMemoryDatabase {
     }
 }
 
+#[async_trait]
 impl KeyDatabase for InMemoryDatabase {
-    fn insert_keybundle(&self, username: &str, key_bundle: KeyBundle) -> Result<bool> {
+    async fn insert_keybundle(
+        &self,
+        username: &str,
+        key_bundle: KeyBundle,
+    ) -> Result<(), KeyError> {
         let mut kb_lock = self
             .key_bundles
             .lock()
-            .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+            .map_err(|_| KeyError::DatabaseError("Lock poisoned".to_string()))?;
         kb_lock.insert(username.to_string(), key_bundle);
-        Ok(true)
+        Ok(())
     }
 
-    fn get_keybundle(&self, username: &str) -> Result<Option<KeyBundle>> {
+    async fn get_keybundle(&self, username: &str) -> Result<Option<KeyBundle>, KeyError> {
         let kb_lock = self
             .key_bundles
             .lock()
-            .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+            .map_err(|_| KeyError::DatabaseError("Lock poisoned".to_string()))?;
         // Return a clone of the key bundle if it exists.
         Ok(kb_lock.get(username).cloned())
     }
 
-    fn add_prekeys(&self, username: &str, prekeys: Vec<Prekey>) -> Result<bool> {
+    async fn add_prekeys(&self, username: &str, prekeys: Vec<Prekey>) -> Result<(), KeyError> {
         let mut kb_lock = self
             .key_bundles
             .lock()
-            .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+            .map_err(|_| KeyError::DatabaseError("Lock poisoned".to_string()))?;
 
         if let Some(bundle) = kb_lock.get_mut(username) {
             // TODO: Ensure no duplicate prekey ids are added.
             bundle.prekeys.extend(prekeys);
-            Ok(true)
+            Ok(())
         } else {
-            Err(anyhow!("Key bundle not found for user: {}", username))
+            Err(KeyError::NotFound(username.to_string()))
         }
     }
 }
 
-#[async_trait]
 impl MessageDatabase for InMemoryDatabase {
-    fn insert_message(&self, message: Message) -> Result<bool> {
+    fn insert_message(&self, message: Message) -> Result<bool, anyhow::Error> {
         let mut messages_lock = self
             .messages
             .lock()
@@ -150,7 +155,7 @@ impl MessageDatabase for InMemoryDatabase {
         Ok(true)
     }
 
-    fn get_messages(&self, username: &str) -> Result<Vec<Message>> {
+    fn get_messages(&self, username: &str) -> Result<Vec<Message>, anyhow::Error> {
         let messages_lock = self
             .messages
             .lock()
@@ -159,7 +164,7 @@ impl MessageDatabase for InMemoryDatabase {
         Ok(messages_lock.get(username).cloned().unwrap_or_default())
     }
 
-    fn mark_delivered(&self, username: &str, ids: Vec<uuid::Uuid>) -> Result<bool> {
+    fn mark_delivered(&self, username: &str, ids: Vec<uuid::Uuid>) -> Result<bool, anyhow::Error> {
         let mut messages_lock = self
             .messages
             .lock()

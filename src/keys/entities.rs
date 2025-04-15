@@ -1,13 +1,21 @@
+use std::fmt::Display;
+
 use anyhow::{Result, anyhow};
 use prism_client::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Prekey {
     pub key_idx: u64,
     pub key: VerifyingKey,
+}
+
+impl Display for Prekey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.key_idx, self.key)
+    }
 }
 
 /// The complete key bundle contains the long-term identity key,

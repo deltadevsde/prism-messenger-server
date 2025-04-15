@@ -1,10 +1,15 @@
+use anyhow::Result;
 use async_trait::async_trait;
-use sqlx::{Row, SqlitePool};
+use prism_client::{Signature, VerifyingKey};
+use sqlx::{Acquire, Row, SqlitePool};
 use uuid::Uuid;
 
 use crate::account::database::{AccountDatabase, AccountDatabaseError};
 use crate::account::entities::Account;
 use crate::crypto::salted_hash::SaltedHash;
+use crate::keys::database::KeyDatabase;
+use crate::keys::entities::{KeyBundle, Prekey};
+use crate::keys::error::KeyError;
 
 pub struct SqliteDatabase {
     pool: SqlitePool,
@@ -15,8 +20,9 @@ impl SqliteDatabase {
         Self { pool }
     }
 
-    /// Creates the accounts table if it doesn't exist
+    /// Creates the necessary tables if they don't exist
     pub async fn init(&self) -> Result<(), sqlx::Error> {
+        // Create accounts table
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS accounts (
@@ -29,8 +35,38 @@ impl SqliteDatabase {
             "#,
         )
         .execute(&self.pool)
-        .await
-        .map(|_| ())
+        .await?;
+
+        // Create key_bundles table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS key_bundles (
+                username TEXT PRIMARY KEY,
+                identity_key BLOB NOT NULL,
+                signed_prekey BLOB NOT NULL,
+                signed_prekey_signature BLOB NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create prekeys table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS prekeys (
+                username TEXT NOT NULL,
+                key_idx INTEGER NOT NULL,
+                key BLOB NOT NULL,
+                PRIMARY KEY (username, key_idx),
+                FOREIGN KEY (username) REFERENCES key_bundles(username) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }
 
@@ -192,9 +228,172 @@ impl AccountDatabase for SqliteDatabase {
     }
 }
 
+#[async_trait]
+impl KeyDatabase for SqliteDatabase {
+    async fn insert_keybundle(&self, user_id: &str, key_bundle: KeyBundle) -> Result<(), KeyError> {
+        let mut tx = self.pool.begin().await?;
+
+        // First, delete any existing key bundle and prekeys for this user
+        sqlx::query("DELETE FROM key_bundles WHERE username = ?")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // Serialize the keys to binary format
+        let identity_key_bytes = key_bundle.identity_key.to_spki_der()?;
+        let signed_prekey_bytes = key_bundle.signed_prekey.to_spki_der()?;
+        let signature_bytes = key_bundle.signed_prekey_signature.to_prism_der()?;
+
+        // Insert the new key bundle
+        sqlx::query(
+            r#"
+            INSERT INTO key_bundles (username, identity_key, signed_prekey, signed_prekey_signature)
+            VALUES (?, ?, ?, ?)
+            "#,
+        )
+        .bind(user_id)
+        .bind(identity_key_bytes)
+        .bind(signed_prekey_bytes)
+        .bind(signature_bytes)
+        .execute(&mut *tx)
+        .await?;
+
+        // Insert the prekeys
+        for prekey in &key_bundle.prekeys {
+            let prekey_bytes = prekey.key.to_spki_der()?;
+
+            sqlx::query(
+                r#"
+                INSERT INTO prekeys (username, key_idx, key)
+                VALUES (?, ?, ?)
+                "#,
+            )
+            .bind(user_id)
+            .bind(prekey.key_idx as i64) // SQLite uses i64 for INTEGER
+            .bind(prekey_bytes)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // Commit the transaction
+        tx.commit()
+            .await
+            .map_err(|e| KeyError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_keybundle(&self, user_id: &str) -> Result<Option<KeyBundle>, KeyError> {
+        // First, check if the key bundle exists
+        let key_bundle_row = sqlx::query(
+            r#"
+            SELECT identity_key, signed_prekey, signed_prekey_signature
+            FROM key_bundles
+            WHERE username = ?
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(row) = key_bundle_row {
+            // Get the identity key
+            let identity_key_bytes: Vec<u8> = row.get("identity_key");
+            let identity_key = VerifyingKey::from_spki_der(&identity_key_bytes)?;
+
+            // Get the signed prekey
+            let signed_prekey_bytes: Vec<u8> = row.get("signed_prekey");
+            let signed_prekey = VerifyingKey::from_spki_der(&signed_prekey_bytes)?;
+
+            // Get the signature
+            let signature_bytes: Vec<u8> = row.get("signed_prekey_signature");
+            let signed_prekey_signature = Signature::from_prism_der(&signature_bytes)?;
+
+            // Get the prekeys
+            let prekeys_rows = sqlx::query(
+                r#"
+                SELECT key_idx, key
+                FROM prekeys
+                WHERE username = ?
+                "#,
+            )
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+            let mut prekeys = Vec::new();
+            for row in prekeys_rows {
+                let key_idx: i64 = row.get("key_idx");
+                let key_bytes: Vec<u8> = row.get("key");
+                let key = VerifyingKey::from_spki_der(&key_bytes)?;
+
+                prekeys.push(Prekey {
+                    key_idx: key_idx as u64,
+                    key,
+                });
+            }
+
+            Ok(Some(KeyBundle {
+                identity_key,
+                signed_prekey,
+                signed_prekey_signature,
+                prekeys,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn add_prekeys(&self, user_id: &str, prekeys: Vec<Prekey>) -> Result<(), KeyError> {
+        // Check if the key bundle exists
+        let exists = sqlx::query("SELECT COUNT(*) as count FROM key_bundles WHERE username = ?")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        let count: i64 = exists.get("count");
+        if count == 0 {
+            return Err(KeyError::NotFound(user_id.to_string()));
+        }
+
+        let mut conn = self.pool.acquire().await?;
+        let mut tx = conn.begin().await?;
+
+        // Insert the prekeys
+        for prekey in &prekeys {
+            let prekey_bytes = prekey.key.to_spki_der()?;
+
+            sqlx::query(
+                r#"
+                INSERT INTO prekeys (username, key_idx, key)
+                VALUES (?, ?, ?)
+                ON CONFLICT(username, key_idx) DO UPDATE SET
+                    key = excluded.key
+                "#,
+            )
+            .bind(user_id)
+            .bind(prekey.key_idx as i64)
+            .bind(prekey_bytes)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // Commit the transaction
+        tx.commit().await?;
+        Ok(())
+    }
+}
+
+impl From<sqlx::Error> for KeyError {
+    fn from(e: sqlx::Error) -> Self {
+        KeyError::DatabaseError(e.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prism_client::SigningKey;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn create_test_pool() -> SqlitePool {
@@ -287,5 +486,115 @@ mod tests {
         } else {
             panic!("Expected AccountDatabaseError::NotFound");
         }
+    }
+
+    #[tokio::test]
+    async fn test_key_database_operations() {
+        let pool = create_test_pool().await;
+        let db = SqliteDatabase::new(pool);
+        db.init().await.expect("Failed to initialize database");
+
+        let username = "keyuser";
+
+        // Create a test key bundle
+        let identity_signing_key = SigningKey::new_ed25519();
+        let identity_key = identity_signing_key.verifying_key();
+        let signed_prekey = SigningKey::new_ed25519().verifying_key();
+        let signed_prekey_signature = identity_signing_key
+            .sign(signed_prekey.to_spki_der().unwrap())
+            .unwrap();
+        let prekey1 = Prekey {
+            key_idx: 1,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+        let prekey2 = Prekey {
+            key_idx: 2,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+
+        let key_bundle = KeyBundle {
+            identity_key: identity_key.clone(),
+            signed_prekey: signed_prekey.clone(),
+            signed_prekey_signature: signed_prekey_signature.clone(),
+            prekeys: vec![prekey1.clone(), prekey2.clone()],
+        };
+
+        // Test inserting a key bundle
+        db.insert_keybundle(username, key_bundle)
+            .await
+            .expect("Failed to insert key bundle");
+
+        // Test retrieving the key bundle
+        let retrieved_bundle = db
+            .get_keybundle(username)
+            .await
+            .expect("Failed to get key bundle")
+            .expect("Key bundle should exist");
+
+        // Directly compare the cryptographic types
+        assert_eq!(&retrieved_bundle.identity_key, &identity_key);
+        assert_eq!(retrieved_bundle.signed_prekey, signed_prekey);
+        assert_eq!(
+            retrieved_bundle.signed_prekey_signature,
+            signed_prekey_signature
+        );
+        assert_eq!(retrieved_bundle.prekeys.len(), 2);
+        assert_eq!(retrieved_bundle.prekeys[0], prekey1);
+        assert_eq!(retrieved_bundle.prekeys[1], prekey2);
+
+        // Test adding additional prekeys
+        let prekey3 = Prekey {
+            key_idx: 3,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+        let prekey4 = Prekey {
+            key_idx: 4,
+            key: SigningKey::new_ed25519().verifying_key(),
+        };
+
+        let additional_prekeys = vec![prekey3.clone(), prekey4.clone()];
+
+        db.add_prekeys(username, additional_prekeys)
+            .await
+            .expect("Failed to add prekeys");
+
+        // Verify the updated bundle has all prekeys
+        let updated_bundle = db
+            .get_keybundle(username)
+            .await
+            .expect("Failed to get updated key bundle")
+            .expect("Updated key bundle should exist");
+
+        // Check the number of prekeys
+        assert_eq!(updated_bundle.prekeys.len(), 4);
+        assert_eq!(updated_bundle.prekeys[2], prekey3);
+        assert_eq!(updated_bundle.prekeys[3], prekey4);
+
+        // Test adding prekeys for non-existent user
+        let non_existent_user = "nonexistentuser";
+        let result = db
+            .add_prekeys(
+                non_existent_user,
+                vec![Prekey {
+                    key_idx: 1,
+                    key: SigningKey::new_ed25519().verifying_key(),
+                }],
+            )
+            .await;
+
+        assert!(result.is_err());
+        if let Err(KeyError::NotFound(user)) = result {
+            assert_eq!(user, non_existent_user);
+        } else {
+            panic!("Expected KeyError::NotFound");
+        }
+
+        // Test getting a non-existent key bundle
+        let non_existent_bundle = db
+            .get_keybundle(non_existent_user)
+            .await
+            .expect("get_keybundle should not fail for non-existent user");
+
+        assert!(non_existent_bundle.is_none(), "Bundle should not exist");
     }
 }
