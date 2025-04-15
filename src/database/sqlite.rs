@@ -100,7 +100,7 @@ impl AccountDatabase for SqliteDatabase {
                         .map_err(|_| AccountDatabaseError::OperationFailed)?,
                 })
             }
-            None => Err(AccountDatabaseError::NotFound(id)),
+            None => Err(AccountDatabaseError::NotFound(id.to_string())),
         }
     }
 
@@ -147,7 +147,7 @@ impl AccountDatabase for SqliteDatabase {
                         .map_err(|_| AccountDatabaseError::OperationFailed)?,
                 })
             }
-            None => Err(AccountDatabaseError::OperationFailed),
+            None => Err(AccountDatabaseError::NotFound(username.to_string())),
         }
     }
 
@@ -185,7 +185,7 @@ impl AccountDatabase for SqliteDatabase {
         .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
         if result.rows_affected() == 0 {
-            return Err(AccountDatabaseError::NotFound(id));
+            return Err(AccountDatabaseError::NotFound(id.to_string()));
         }
 
         Ok(())
@@ -242,7 +242,7 @@ mod tests {
         let result = db.fetch_account(account_id).await;
         assert!(result.is_err());
         if let Err(AccountDatabaseError::NotFound(id)) = result {
-            assert_eq!(id, account_id);
+            assert_eq!(id, account_id.to_string());
         } else {
             panic!("Expected AccountDatabaseError::NotFound");
         }
@@ -283,7 +283,7 @@ mod tests {
             .await;
         assert!(result.is_err());
         if let Err(AccountDatabaseError::NotFound(id)) = result {
-            assert_eq!(id, non_existent_id);
+            assert_eq!(id, non_existent_id.to_string());
         } else {
             panic!("Expected AccountDatabaseError::NotFound");
         }
