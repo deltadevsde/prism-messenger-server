@@ -2895,6 +2895,7 @@ dependencies = [
 [[package]]
 name = "prism-client"
 version = "0.1.0"
+source = "git+https://github.com/deltadevsde/prism.git?branch=main#3c1051592b6503993aad3a43718489ab8d30608d"
 dependencies = [
  "async-trait",
  "prism-common",
@@ -2909,6 +2910,7 @@ dependencies = [
 [[package]]
 name = "prism-common"
 version = "0.1.0"
+source = "git+https://github.com/deltadevsde/prism.git?branch=main#3c1051592b6503993aad3a43718489ab8d30608d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2925,6 +2927,7 @@ dependencies = [
 [[package]]
 name = "prism-keys"
 version = "0.1.0"
+source = "git+https://github.com/deltadevsde/prism.git?branch=main#3c1051592b6503993aad3a43718489ab8d30608d"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -2979,6 +2982,7 @@ dependencies = [
 [[package]]
 name = "prism-serde"
 version = "0.1.0"
+source = "git+https://github.com/deltadevsde/prism.git?branch=main#3c1051592b6503993aad3a43718489ab8d30608d"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

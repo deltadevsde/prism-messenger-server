@@ -1,3 +1,5 @@
+cargo-features = ["edition2024"]
+
 [package]
 name = "prism-messenger-server"
 version = "0.1.0"
@@ -37,7 +39,9 @@ sqlx = { version = "0.7", features = [
 argon2 = "0.5.3"
 
 # Prism
-prism-client = { path = "../prism/crates/client", features = ["mockall"] }
+prism-client = { git = "https://github.com/deltadevsde/prism.git", branch = "main", features = [
+    "mockall",
+] }
 keystore-rs = { version = "0.3" }
 
 # Errors
