@@ -43,7 +43,7 @@ impl Settings {
     pub fn load() -> Result<Settings, ConfigError> {
         let settings = Config::builder()
             .add_source(config::File::with_name("settings"))
-            .add_source(config::Environment::with_prefix("PRISM_MSG_"))
+            .add_source(config::Environment::with_prefix("PRISM_MSG").separator("_"))
             .build()?;
 
         settings.try_deserialize()
