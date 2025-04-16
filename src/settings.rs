@@ -1,4 +1,6 @@
-use config::{Config, ConfigError};
+use std::path::Path;
+
+use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -42,8 +44,17 @@ pub struct Settings {
 impl Settings {
     pub fn load() -> Result<Settings, ConfigError> {
         let settings = Config::builder()
-            .add_source(config::File::with_name("settings"))
-            .add_source(config::Environment::with_prefix("PRISM_MSG").separator("_"))
+            .add_source(File::with_name("settings"))
+            .add_source(Environment::with_prefix("PRISM_MSG").separator("_"))
+            .build()?;
+
+        settings.try_deserialize()
+    }
+
+    pub fn load_from_path(path: impl AsRef<Path>) -> Result<Settings, ConfigError> {
+        let settings = Config::builder()
+            .add_source(File::from(path.as_ref()))
+            .add_source(Environment::with_prefix("PRISM_MSG").separator("_"))
             .build()?;
 
         settings.try_deserialize()
