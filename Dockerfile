@@ -43,5 +43,7 @@ COPY --from=builder /usr/src/app/target/release/prism-messenger-server /usr/loca
 # Set the working directory
 WORKDIR /home/prism
 
+ENV RUST_LOG=debug
+
 # Run the application
 ENTRYPOINT [ "prism-messenger-server" ]
