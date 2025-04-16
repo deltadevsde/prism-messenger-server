@@ -13,6 +13,7 @@ pub struct WebserverSettings {
 pub struct PrismSettings {
     pub host: String,
     pub port: u16,
+    #[serde(rename = "signing_key")]
     pub signing_key_path: String,
 }
 
@@ -21,6 +22,7 @@ pub struct ApnsSettings {
     pub team_id: String,
     pub key_id: String,
     pub bundle_id: String,
+    #[serde(rename = "private_key")]
     pub private_key_path: String,
 }
 
@@ -45,7 +47,7 @@ impl Settings {
     pub fn load() -> Result<Settings, ConfigError> {
         let settings = Config::builder()
             .add_source(File::with_name("settings"))
-            .add_source(Environment::with_prefix("PRISM_MSG").separator("_"))
+            .add_source(Environment::with_prefix("PRISM_MSG").separator("__"))
             .build()?;
 
         settings.try_deserialize()
@@ -54,7 +56,7 @@ impl Settings {
     pub fn load_from_path(path: impl AsRef<Path>) -> Result<Settings, ConfigError> {
         let settings = Config::builder()
             .add_source(File::from(path.as_ref()))
-            .add_source(Environment::with_prefix("PRISM_MSG").separator("_"))
+            .add_source(Environment::with_prefix("PRISM_MSG").separator("__"))
             .build()?;
 
         settings.try_deserialize()
