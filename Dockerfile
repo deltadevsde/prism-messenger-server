@@ -14,13 +14,6 @@ WORKDIR /usr/src/app
 # Copy the Cargo.toml and Cargo.lock files
 COPY Cargo.toml Cargo.lock ./
 
-# Create dummy source files to cache dependencies
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs
-
-# Build dependencies only (this layer will be cached)
-RUN cargo build --release
-
 # Copy the actual source code
 COPY src ./src
 COPY settings.example.toml ./settings.example.toml
