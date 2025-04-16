@@ -7,12 +7,12 @@ port = 44444
 [prism]
 host = "127.0.0.1"
 port = 55555
-signing_key_path = "~/.prism/PrismMessengerServer_SigningKey.p8"
+signing_key = "~/.prism/PrismMessengerServer_SigningKey.p8"
 
 [apns]
 team_id = "T1E234A5M"
 key_id = "K12E34Y56"
-private_key_path = "~/.prism/AuthKey_K12E34Y56.p8"
+private_key = "~/.prism/AuthKey_K12E34Y56.p8"
 bundle_id = "com.whatever.PrismMessenger"
 
 [database]
