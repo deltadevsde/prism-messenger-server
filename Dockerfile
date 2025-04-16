@@ -37,6 +37,21 @@ COPY --from=builder /usr/src/app/target/release/prism-messenger-server /usr/loca
 WORKDIR /home/prism
 
 ENV RUST_LOG=debug
+ENV PRISM_MSG_SETTINGS_FILE="/home/prism/settings.toml"
 
-# Run the application
-ENTRYPOINT [ "prism-messenger-server" ]
+ENV PRISM_MSG_WEBSERVER_HOST="127.0.0.1"
+ENV PRISM_MSG_WEBSERVER_PORT=8080
+
+ENV PRISM_MSG_PRISM_HOST="127.0.0.1"
+ENV PRISM_MSG_PRISM_PORT=50020
+ENV PRISM_MSG_PRISM_SIGNING_KEY_PATH="/home/prism/prism-signing-key.p8"
+
+ENV PRISM_MSG_APNS_TEAM_ID="T1E234A5M"
+ENV PRISM_MSG_APNS_KEY_ID="K12E34Y56"
+ENV PRISM_MSG_APNS_PRIVATE_KEY_PATH="/home/prism/apns-auth-key.p8"
+ENV PRISM_MSG_APNS_BUNDLE_ID="com.whatever.prism"
+
+ENV PRISM_MSG_DATABASE_TYPE="sqlite"
+ENV PRISM_MSG_DATABASE_PATH="/home/prism/prism_messenger.sqlite"
+
+ENTRYPOINT prism-messenger-server -s "$PRISM_MSG_SETTINGS_FILE"
