@@ -14,15 +14,6 @@ WORKDIR /usr/src/app
 # Copy only the files needed for dependency resolution
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to pre-download dependencies
-RUN mkdir -p src && echo "fn main() {}" > src/main.rs
-
-# Build dependencies only (this layer will be cached)
-RUN cargo build --release
-
-# Remove the dummy main.rs
-RUN rm src/main.rs
-
 # Copy the actual source code
 COPY src ./src
 
@@ -41,6 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy the binary from the builder stage
 COPY --from=builder /usr/src/app/target/release/prism-messenger-server /usr/local/bin/
+
+# Copy the example settings file
+COPY settings.example.toml /home/prism/settings.toml
 
 # Set the working directory
 WORKDIR /home/prism
