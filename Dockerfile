@@ -18,7 +18,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 # Build the application
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Final stage
 FROM debian:bookworm-slim
@@ -40,6 +40,6 @@ COPY settings.example.toml /home/prism/settings.toml
 WORKDIR /home/prism
 
 ENV RUST_LOG=debug
-ENV PRISM_MSG_SETTINGS_FILE="/home/prism/settings.toml"
+ENV PRISM_MSG__SETTINGS_FILE="/home/prism/settings.toml"
 
 ENTRYPOINT ["prism-messenger-server"] 
