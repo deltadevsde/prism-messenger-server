@@ -13,3 +13,6 @@ target/
 
 # Settings
 /settings.toml
+
+# Environment variables
+.env

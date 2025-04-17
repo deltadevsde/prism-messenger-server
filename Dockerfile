@@ -1,7 +1,7 @@
 # Build stage
-FROM rust:1.86-slim-bookworm AS builder
+FROM --platform=$BUILDPLATFORM rust:1.86-slim-bookworm AS builder
 
-# Install build dependencies
+# Install required build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
@@ -11,19 +11,20 @@ RUN apt-get update && apt-get install -y \
 # Create a new empty shell project
 WORKDIR /usr/src/app
 
-# Copy the Cargo.toml and Cargo.lock files
+# Copy only the files needed for dependency resolution
 COPY Cargo.toml Cargo.lock ./
 
-# Create dummy source files to cache dependencies
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs
+# Create a dummy main.rs to pre-download dependencies
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies only (this layer will be cached)
 RUN cargo build --release
 
+# Remove the dummy main.rs
+RUN rm src/main.rs
+
 # Copy the actual source code
 COPY src ./src
-COPY settings.example.toml ./settings.example.toml
 
 # Build the application
 RUN cargo build --release
@@ -32,16 +33,18 @@ RUN cargo build --release
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
-# Copy the binary
+# Copy the binary from the builder stage
 COPY --from=builder /usr/src/app/target/release/prism-messenger-server /usr/local/bin/
 
 # Set the working directory
-WORKDIR /home/prism
+WORKDIR /var/lib/prism-messenger
 
-# Run the application
-ENTRYPOINT [ "prism-messenger-server" ]
+# Run the application with logging enabled
+ENV RUST_LOG=info,prism_messenger_server=debug,tower_http=debug
+ENTRYPOINT ["prism-messenger-server"] 

@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Rust
+/target
+**/*.rs.bk
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentation
+README.md
+LICENSE 
