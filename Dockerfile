@@ -43,8 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/src/app/target/release/prism-messenger-server /usr/local/bin/
 
 # Set the working directory
-WORKDIR /var/lib/prism-messenger
+WORKDIR /home/prism
 
-# Run the application with logging enabled
-ENV RUST_LOG=info,prism_messenger_server=debug,tower_http=debug
+ENV RUST_LOG=debug
+ENV PRISM_MSG_SETTINGS_FILE="/home/prism/settings.toml"
+
 ENTRYPOINT ["prism-messenger-server"] 
