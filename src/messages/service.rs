@@ -59,9 +59,17 @@ where
             .fetch_account_by_username(&recipient_username)
             .await?;
         if let Some(device_token) = recipient_account.apns_token {
-            self.notification_gateway
+            match self
+                .notification_gateway
                 .send_silent_notification(&device_token)
-                .await?;
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!("Failed to send notification: {}", e);
+                    return Err(e.into());
+                }
+            }
         }
 
         Ok(MessageReceipt {
