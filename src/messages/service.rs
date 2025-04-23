@@ -1,10 +1,10 @@
-use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use super::{
     database::MessageDatabase,
     entities::{DoubleRatchetMessage, Message, MessageReceipt},
+    error::MessagingError,
 };
 use crate::{account::database::AccountDatabase, notifications::gateway::NotificationGateway};
 
@@ -42,7 +42,7 @@ where
         sender_username: String,
         recipient_username: String,
         message: DoubleRatchetMessage,
-    ) -> Result<MessageReceipt> {
+    ) -> Result<MessageReceipt, MessagingError> {
         let timestamp = chrono::Utc::now().timestamp_millis() as u64;
         let message = Message {
             message_id: uuid::Uuid::new_v4(),
@@ -70,11 +70,15 @@ where
         })
     }
 
-    pub async fn get_messages(&self, username: &str) -> Result<Vec<Message>> {
+    pub async fn get_messages(&self, username: &str) -> Result<Vec<Message>, MessagingError> {
         self.messages_db.get_messages(username)
     }
 
-    pub async fn mark_delivered(&self, username: &str, message_ids: Vec<Uuid>) -> Result<bool> {
+    pub async fn mark_delivered(
+        &self,
+        username: &str,
+        message_ids: Vec<Uuid>,
+    ) -> Result<bool, MessagingError> {
         self.messages_db.mark_delivered(username, message_ids)
     }
 }
