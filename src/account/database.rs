@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use mockall::automock;
 use uuid::Uuid;
 
 use super::entities::Account;
@@ -12,7 +11,7 @@ pub enum AccountDatabaseError {
     NotFound(String),
 }
 
-#[cfg_attr(test, automock)]
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait AccountDatabase {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError>;
