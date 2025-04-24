@@ -1,6 +1,5 @@
 use axum::{
-    Extension, Json, extract::State, http::StatusCode, middleware::from_fn_with_state,
-    response::IntoResponse,
+    Extension, Json, extract::State, middleware::from_fn_with_state, response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -46,6 +45,7 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     request_body = SendMessageRequest,
     responses(
         (status = 200, description = "Message sent successfully", body = MessageReceipt),
+        (status = 400, description = "Bad rquest"),
         (status = 500, description = "Internal server error")
     ),
     tag = MESSAGING_TAG
@@ -54,13 +54,12 @@ async fn send_message(
     State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(req): Json<SendMessageRequest>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
         .send_message(account.username, req.recipient_username, req.message)
         .await
         .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 #[utoipa::path(
@@ -68,6 +67,7 @@ async fn send_message(
     path = "/get",
     responses(
         (status = 200, description = "Messages fetched successfully", body = Vec<Message>),
+        (status = 400, description = "Bad rquest"),
         (status = 500, description = "Internal server error")
     ),
     tag = MESSAGING_TAG
@@ -75,13 +75,12 @@ async fn send_message(
 async fn fetch_messages(
     State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
         .get_messages(&account.username)
         .await
         .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 #[utoipa::path(
@@ -90,6 +89,7 @@ async fn fetch_messages(
     request_body = MarkDeliveredRequest,
     responses(
         (status = 200, description = "Messages marked as delivered successfully", body = bool),
+        (status = 400, description = "Bad rquest"),
         (status = 500, description = "Internal server error")
     ),
     tag = MESSAGING_TAG
@@ -98,11 +98,10 @@ async fn mark_delivered(
     State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
     Json(request): Json<MarkDeliveredRequest>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
         .mark_delivered(&account.username, request.message_ids)
         .await
         .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }

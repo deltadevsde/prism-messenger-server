@@ -1,10 +1,10 @@
-use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use super::{
     database::MessageDatabase,
     entities::{DoubleRatchetMessage, Message, MessageReceipt},
+    error::MessagingError,
 };
 use crate::{account::database::AccountDatabase, notifications::gateway::NotificationGateway};
 
@@ -42,7 +42,7 @@ where
         sender_username: String,
         recipient_username: String,
         message: DoubleRatchetMessage,
-    ) -> Result<MessageReceipt> {
+    ) -> Result<MessageReceipt, MessagingError> {
         let timestamp = chrono::Utc::now().timestamp_millis() as u64;
         let message = Message {
             message_id: uuid::Uuid::new_v4(),
@@ -59,9 +59,17 @@ where
             .fetch_account_by_username(&recipient_username)
             .await?;
         if let Some(device_token) = recipient_account.apns_token {
-            self.notification_gateway
+            match self
+                .notification_gateway
                 .send_silent_notification(&device_token)
-                .await?;
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!("Failed to send notification: {}", e);
+                    return Err(e.into());
+                }
+            }
         }
 
         Ok(MessageReceipt {
@@ -70,30 +78,34 @@ where
         })
     }
 
-    pub async fn get_messages(&self, username: &str) -> Result<Vec<Message>> {
+    pub async fn get_messages(&self, username: &str) -> Result<Vec<Message>, MessagingError> {
         self.messages_db.get_messages(username)
     }
 
-    pub async fn mark_delivered(&self, username: &str, message_ids: Vec<Uuid>) -> Result<bool> {
+    pub async fn mark_delivered(
+        &self,
+        username: &str,
+        message_ids: Vec<Uuid>,
+    ) -> Result<bool, MessagingError> {
         self.messages_db.mark_delivered(username, message_ids)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use mockall::predicate::eq;
     use prism_client::SigningKey;
+    use std::sync::Arc;
     use uuid::Uuid;
 
-    use crate::account::database::AccountDatabase;
+    use crate::account::database::{AccountDatabase, AccountDatabaseError, MockAccountDatabase};
     use crate::account::entities::Account;
     use crate::database::inmemory::InMemoryDatabase;
-
+    use crate::messages::database::MockMessageDatabase;
     use crate::messages::entities::{DoubleRatchetHeader, DoubleRatchetMessage};
-    use crate::notifications::gateway::MockNotificationGateway;
+    use crate::messages::error::MessagingError;
     use crate::notifications::gateway::dummy::DummyNotificationGateway;
+    use crate::notifications::gateway::{MockNotificationGateway, NotificationError};
 
     use super::MessagingService;
 
@@ -248,5 +260,210 @@ mod tests {
         .unwrap();
 
         db
+    }
+
+    #[tokio::test]
+    async fn test_send_message_user_not_found() {
+        // Setup mock account database that returns NotFound for the recipient
+        let mut mock_account_db = MockAccountDatabase::new();
+        mock_account_db
+            .expect_fetch_account_by_username()
+            .with(eq("unknown_user"))
+            .times(1)
+            .returning(|username| Err(AccountDatabaseError::NotFound(username.to_string())));
+
+        // Setup mock message database
+        let mut mock_message_db = MockMessageDatabase::new();
+        mock_message_db
+            .expect_insert_message()
+            .times(1)
+            .returning(|_| Ok(true));
+
+        // Setup mock notification gateway (not expected to be called)
+        let mock_notification_gw = MockNotificationGateway::new();
+
+        // Create the service with our mocks
+        let service = MessagingService::new(
+            Arc::new(mock_account_db),
+            Arc::new(mock_message_db),
+            Arc::new(mock_notification_gw),
+        );
+
+        // Create a test message
+        let message = create_test_message();
+
+        // Call service.send_message with unknown recipient
+        let result = service
+            .send_message("sender".to_string(), "unknown_user".to_string(), message)
+            .await;
+
+        // Verify we get UserNotFound error
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MessagingError::UserNotFound(username) if username == "unknown_user")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_send_message_database_error() {
+        // Setup mock message database that returns an error
+        let mut mock_message_db = MockMessageDatabase::new();
+        mock_message_db
+            .expect_insert_message()
+            .times(1)
+            .returning(|_| Err(MessagingError::DatabaseError("Database error".to_string())));
+
+        // Setup mock account database (not expected to be called because db error happens first)
+        let mock_account_db = MockAccountDatabase::new();
+
+        // Setup mock notification gateway (not expected to be called)
+        let mock_notification_gw = MockNotificationGateway::new();
+
+        // Create the service with our mocks
+        let service = MessagingService::new(
+            Arc::new(mock_account_db),
+            Arc::new(mock_message_db),
+            Arc::new(mock_notification_gw),
+        );
+
+        // Create a test message
+        let message = create_test_message();
+
+        // Call service.send_message
+        let result = service
+            .send_message("sender".to_string(), "recipient".to_string(), message)
+            .await;
+
+        // Verify we get DatabaseError
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, MessagingError::DatabaseError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_send_message_notification_error() {
+        // Setup mock account database that returns an account with a token
+        let mut mock_account_db = MockAccountDatabase::new();
+        mock_account_db
+            .expect_fetch_account_by_username()
+            .with(eq("recipient"))
+            .times(1)
+            .returning(|_| {
+                Ok(Account::new(
+                    "recipient".to_string(),
+                    "password",
+                    Some(vec![1, 2, 3, 4]), // Device token
+                    None,
+                ))
+            });
+
+        // Setup mock message database
+        let mut mock_message_db = MockMessageDatabase::new();
+        mock_message_db
+            .expect_insert_message()
+            .times(1)
+            .returning(|_| Ok(true));
+
+        // Setup mock notification gateway that returns an error
+        let mut mock_notification_gw = MockNotificationGateway::new();
+        mock_notification_gw
+            .expect_send_silent_notification()
+            .with(eq(vec![1, 2, 3, 4]))
+            .times(1)
+            .returning(|_| {
+                Err(NotificationError::SendFailure(
+                    "Failed to send notification".to_string(),
+                ))
+            });
+
+        // Create the service with our mocks
+        let service = MessagingService::new(
+            Arc::new(mock_account_db),
+            Arc::new(mock_message_db),
+            Arc::new(mock_notification_gw),
+        );
+
+        // Create a test message
+        let message = create_test_message();
+
+        // Call service.send_message
+        let result = service
+            .send_message("sender".to_string(), "recipient".to_string(), message)
+            .await;
+
+        // Verify we get NotificationError
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, MessagingError::NotificationError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_get_messages_database_error() {
+        // Setup mock message database that returns an error
+        let mut mock_message_db = MockMessageDatabase::new();
+        mock_message_db
+            .expect_get_messages()
+            .with(eq("user"))
+            .times(1)
+            .returning(|_| Err(MessagingError::DatabaseError("Database error".to_string())));
+
+        // Create the service with our mocks
+        let service = MessagingService::new(
+            Arc::new(MockAccountDatabase::new()),
+            Arc::new(mock_message_db),
+            Arc::new(MockNotificationGateway::new()),
+        );
+
+        // Call service.get_messages
+        let result = service.get_messages("user").await;
+
+        // Verify we get DatabaseError
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, MessagingError::DatabaseError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_mark_delivered_database_error() {
+        // Setup mock message database that returns an error
+        let mut mock_message_db = MockMessageDatabase::new();
+        mock_message_db
+            .expect_mark_delivered()
+            .with(eq("user"), eq(vec![Uuid::nil()]))
+            .times(1)
+            .returning(|_, _| Err(MessagingError::DatabaseError("Database error".to_string())));
+
+        // Create the service with our mocks
+        let service = MessagingService::new(
+            Arc::new(MockAccountDatabase::new()),
+            Arc::new(mock_message_db),
+            Arc::new(MockNotificationGateway::new()),
+        );
+
+        // Call service.mark_delivered
+        let result = service.mark_delivered("user", vec![Uuid::nil()]).await;
+
+        // Verify we get DatabaseError
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, MessagingError::DatabaseError(_)));
+    }
+
+    // Helper function to create a test message
+    fn create_test_message() -> DoubleRatchetMessage {
+        let ephemeral_key = SigningKey::new_secp256r1().verifying_key();
+        let header = DoubleRatchetHeader {
+            ephemeral_key,
+            message_number: 0,
+            previous_message_number: 0,
+            one_time_prekey_id: None,
+        };
+
+        DoubleRatchetMessage {
+            header,
+            ciphertext: "Test message".as_bytes().to_vec(),
+            nonce: vec![0; 12],
+        }
     }
 }

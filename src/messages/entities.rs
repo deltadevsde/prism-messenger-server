@@ -7,7 +7,7 @@ use uuid::Uuid;
 /// The header provides the recipient with the context needed to update
 /// its ratchet state. It includes the sender’s ephemeral public key and
 /// message counters.
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DoubleRatchetHeader {
     /// Sender's ephemeral DH public key for this message
@@ -23,7 +23,7 @@ pub struct DoubleRatchetHeader {
 /// The complete double ratchet message.
 /// The header is bound to the ciphertext via the AEAD process.
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DoubleRatchetMessage {
     pub header: DoubleRatchetHeader,
@@ -34,7 +34,7 @@ pub struct DoubleRatchetMessage {
     pub nonce: Vec<u8>,
 }
 
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageReceipt {
     /// UUID
@@ -44,7 +44,7 @@ pub struct MessageReceipt {
 }
 
 /// The message delivered to a client includes sender/recipient metadata.
-#[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
     pub message_id: uuid::Uuid,

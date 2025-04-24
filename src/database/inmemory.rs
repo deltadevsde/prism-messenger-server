@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -14,7 +13,7 @@ use crate::{
         entities::{KeyBundle, Prekey},
         error::KeyError,
     },
-    messages::{database::MessageDatabase, entities::Message},
+    messages::{database::MessageDatabase, entities::Message, error::MessagingError},
 };
 
 pub struct InMemoryDatabase {
@@ -143,11 +142,10 @@ impl KeyDatabase for InMemoryDatabase {
 }
 
 impl MessageDatabase for InMemoryDatabase {
-    fn insert_message(&self, message: Message) -> Result<bool, anyhow::Error> {
-        let mut messages_lock = self
-            .messages
-            .lock()
-            .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+    fn insert_message(&self, message: Message) -> Result<bool, MessagingError> {
+        let mut messages_lock = self.messages.lock().map_err(|e| {
+            MessagingError::DatabaseError(format!("Lock poisoned during message storage: {}", e))
+        })?;
         messages_lock
             .entry(message.recipient_username.clone())
             .or_insert_with(Vec::new)
@@ -155,20 +153,21 @@ impl MessageDatabase for InMemoryDatabase {
         Ok(true)
     }
 
-    fn get_messages(&self, username: &str) -> Result<Vec<Message>, anyhow::Error> {
-        let messages_lock = self
-            .messages
-            .lock()
-            .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+    fn get_messages(&self, username: &str) -> Result<Vec<Message>, MessagingError> {
+        let messages_lock = self.messages.lock().map_err(|e| {
+            MessagingError::DatabaseError(format!("Lock poisoned during message retrieval: {}", e))
+        })?;
         // Return a cloned vector of messages (if any) so that users can work on their own copy.
         Ok(messages_lock.get(username).cloned().unwrap_or_default())
     }
 
-    fn mark_delivered(&self, username: &str, ids: Vec<uuid::Uuid>) -> Result<bool, anyhow::Error> {
-        let mut messages_lock = self
-            .messages
-            .lock()
-            .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+    fn mark_delivered(&self, username: &str, ids: Vec<uuid::Uuid>) -> Result<bool, MessagingError> {
+        let mut messages_lock = self.messages.lock().map_err(|e| {
+            MessagingError::DatabaseError(format!(
+                "Lock poisoned during message delivery status update: {}",
+                e
+            ))
+        })?;
         let Some(messages) = messages_lock.get_mut(username) else {
             return Ok(false);
         };

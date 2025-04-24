@@ -1,0 +1,46 @@
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use thiserror::Error;
+
+use crate::{account::database::AccountDatabaseError, notifications::gateway::NotificationError};
+
+#[derive(Debug, Error)]
+pub enum MessagingError {
+    #[error("User not found: {0}")]
+    UserNotFound(String),
+
+    #[error("Database operation failed: {0}")]
+    DatabaseError(String),
+
+    #[error("Notification delivery failed: {0}")]
+    NotificationError(String),
+}
+
+impl From<AccountDatabaseError> for MessagingError {
+    fn from(err: AccountDatabaseError) -> Self {
+        match err {
+            AccountDatabaseError::NotFound(username) => MessagingError::UserNotFound(username),
+            AccountDatabaseError::OperationFailed => {
+                MessagingError::DatabaseError("Account database operation failed".to_string())
+            }
+        }
+    }
+}
+
+impl From<NotificationError> for MessagingError {
+    fn from(err: NotificationError) -> Self {
+        MessagingError::NotificationError(err.to_string())
+    }
+}
+
+impl IntoResponse for MessagingError {
+    fn into_response(self) -> Response {
+        let status = match self {
+            MessagingError::UserNotFound(_) => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        status.into_response()
+    }
+}

@@ -2,7 +2,6 @@ pub mod apns;
 pub mod dummy;
 
 use async_trait::async_trait;
-use mockall::automock;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -14,7 +13,7 @@ pub enum NotificationError {
     InitializationFailed(String),
 }
 
-#[cfg_attr(test, automock)]
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait NotificationGateway {
     async fn send_silent_notification(&self, device_token: &[u8]) -> Result<(), NotificationError>;
