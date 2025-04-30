@@ -11,9 +11,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    account, 
-    context::AppContext,
-    keys, messages, registration, 
+    account, context::AppContext, keys, messages, profiles, registration,
     settings::WebserverSettings,
 };
 
@@ -26,6 +24,7 @@ pub async fn start(settings: &WebserverSettings, context: AppContext) -> Result<
         .nest("/accounts", account::router(context_arc.clone()))
         .nest("/keys", keys::router(context_arc.clone()))
         .nest("/messages", messages::router(context_arc.clone()))
+        .nest("/profiles", profiles::router(context_arc.clone()))
         .nest("/registration", registration::router())
         .with_state(context_arc)
         .layer(CorsLayer::permissive())
