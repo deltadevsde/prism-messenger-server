@@ -107,7 +107,7 @@ where
             .as_millis() as u64;
 
         // Save the updated profile
-        self.profile_db.upsert_profile(profile).await?;
+        self.profile_db.upsert_profile(profile.clone()).await?;
 
         // Return the appropriate response based on the action
         match action {
@@ -117,7 +117,9 @@ where
             }
             ProfilePictureAction::Update => {
                 // Return upload URL when profile picture is being updated
-                let upload_info = self.generate_profile_picture_upload_url(username).await?;
+                let upload_info = self
+                    .generate_profile_picture_upload_url_from_profile(&profile)
+                    .await?;
                 Ok(Some(upload_info))
             }
         }
@@ -134,6 +136,16 @@ where
             None => return Err(ProfileError::NotFound),
         };
 
+        // Call the helper method to generate the upload URL
+        self.generate_profile_picture_upload_url_from_profile(&profile)
+            .await
+    }
+
+    /// Generate a pre-signed URL for uploading a profile picture from an existing profile
+    async fn generate_profile_picture_upload_url_from_profile(
+        &self,
+        profile: &Profile,
+    ) -> Result<ProfilePictureUploadResponse, ProfileError> {
         // Generate the upload URL from S3
         let (upload_url, picture_url, expires_in) =
             self.picture_storage.generate_upload_url(profile.id).await?;

@@ -236,7 +236,7 @@ impl ProfilePictureStorage for InMemoryDatabase {
         // but would be replaced by real S3 URLs in production
         let upload_url = format!("https://example.com/upload/{}", profile_id);
         let picture_url = format!("https://example.com/images/{}", profile_id);
-        let expires_in = 3600; // 1 hour
+        let expires_in = 300; // 5 minutes in seconds
 
         // Remember the picture URL for this profile
         let mut picture_urls = self
