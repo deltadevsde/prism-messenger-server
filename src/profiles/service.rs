@@ -1,0 +1,148 @@
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
+
+use super::database::{ProfileDatabase, ProfilePictureStorage};
+use super::entities::{
+    Profile, ProfilePictureAction, ProfilePictureUploadResponse, UpdateProfileRequest,
+};
+use super::error::ProfileError;
+
+pub struct ProfileService<D, S>
+where
+    D: ProfileDatabase,
+    S: ProfilePictureStorage,
+{
+    profile_db: Arc<D>,
+    picture_storage: Arc<S>,
+}
+
+impl<D, S> ProfileService<D, S>
+where
+    D: ProfileDatabase,
+    S: ProfilePictureStorage,
+{
+    pub fn new(profile_db: Arc<D>, picture_storage: Arc<S>) -> Self {
+        Self {
+            profile_db,
+            picture_storage,
+        }
+    }
+
+    /// Get a profile by ID
+    pub async fn get_profile_by_id(&self, id: Uuid) -> Result<Profile, ProfileError> {
+        match self.profile_db.get_profile_by_id(id).await? {
+            Some(profile) => Ok(profile),
+            None => Err(ProfileError::NotFound),
+        }
+    }
+
+    /// Get a profile by username
+    pub async fn get_profile_by_username(&self, username: &str) -> Result<Profile, ProfileError> {
+        match self.profile_db.get_profile_by_username(username).await? {
+            Some(profile) => Ok(profile),
+            None => Err(ProfileError::NotFound),
+        }
+    }
+
+    /// Create a new profile for a user
+    pub async fn create_profile(&self, username: String) -> Result<Profile, ProfileError> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| ProfileError::Internal(e.to_string()))?
+            .as_millis() as u64;
+
+        let profile = Profile {
+            id: Uuid::new_v4(),
+            username: username.clone(),
+            display_name: username,
+            profile_picture_url: None,
+            updated_at: now,
+        };
+
+        self.profile_db.upsert_profile(profile).await
+    }
+
+    /// Updates a user's profile. If profile picture shall be updated, creates a new upload URL.
+    pub async fn update_profile(
+        &self,
+        username: &str,
+        update_req: UpdateProfileRequest,
+    ) -> Result<Option<ProfilePictureUploadResponse>, ProfileError> {
+        // Get the existing profile
+        let mut profile = match self.profile_db.get_profile_by_username(username).await? {
+            Some(profile) => profile,
+            None => return Err(ProfileError::NotFound),
+        };
+
+        // Update fields if provided
+        if let Some(display_name) = update_req.display_name {
+            profile.display_name = display_name;
+        }
+
+        // Store the action for later use
+        let action = update_req.profile_picture_action.clone();
+
+        // Handle profile picture action
+        match &action {
+            ProfilePictureAction::NoChange => {
+                // Do nothing with the profile picture
+            }
+            ProfilePictureAction::Clear | ProfilePictureAction::Update => {
+                // If there was a previous picture, delete it
+                if profile.profile_picture_url.is_some() {
+                    self.picture_storage
+                        .delete_profile_picture(profile.id)
+                        .await?;
+                }
+                profile.profile_picture_url = None;
+                // For Update action, the actual update will happen when the client uploads a new picture
+            }
+        }
+
+        // Update the timestamp
+        profile.updated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| ProfileError::Internal(e.to_string()))?
+            .as_millis() as u64;
+
+        // Save the updated profile
+        self.profile_db.upsert_profile(profile).await?;
+
+        // Return the appropriate response based on the action
+        match action {
+            ProfilePictureAction::NoChange | ProfilePictureAction::Clear => {
+                // Return None when profile picture is not being updated
+                Ok(None)
+            }
+            ProfilePictureAction::Update => {
+                // Return upload URL when profile picture is being updated
+                let upload_info = self.generate_profile_picture_upload_url(username).await?;
+                Ok(Some(upload_info))
+            }
+        }
+    }
+
+    /// Generate a pre-signed URL for uploading a profile picture
+    pub async fn generate_profile_picture_upload_url(
+        &self,
+        username: &str,
+    ) -> Result<ProfilePictureUploadResponse, ProfileError> {
+        // Get the profile to ensure it exists and to get the ID
+        let profile = match self.profile_db.get_profile_by_username(username).await? {
+            Some(profile) => profile,
+            None => return Err(ProfileError::NotFound),
+        };
+
+        // Generate the upload URL from S3
+        let (upload_url, picture_url, expires_in) =
+            self.picture_storage.generate_upload_url(profile.id).await?;
+
+        // Return the response
+        Ok(ProfilePictureUploadResponse {
+            upload_url,
+            picture_url,
+            expires_in,
+        })
+    }
+}
