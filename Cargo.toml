@@ -9,6 +9,10 @@ tokio = { version = "1.16.1", features = ["full"] }
 always_send = { version = "0.1.1" }
 async-trait = { version = "0.1.88" }
 
+# AWS
+aws-config = { version = "1.6.2" }
+aws-sdk-s3 = { version = "1.83.0" }
+
 # Build & CI
 config = { version = "0.15.11", default-features = false, features = [
     "toml",
