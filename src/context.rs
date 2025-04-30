@@ -2,6 +2,7 @@ use anyhow::{Result, bail};
 use prism_client::{PrismHttpClient, SigningKey};
 use std::{path::Path, sync::Arc};
 
+use crate::profiles::service::ProfileService;
 use crate::{
     account::{auth::service::AuthService, service::AccountService},
     database::{inmemory::InMemoryDatabase, pool::create_sqlite_pool, sqlite::SqliteDatabase},
@@ -19,6 +20,7 @@ pub struct AppContext {
     pub key_service: KeyService<PrismHttpClient, SqliteDatabase>,
     pub messaging_service:
         MessagingService<SqliteDatabase, InMemoryDatabase, ApnsNotificationGateway>,
+    pub profile_service: ProfileService<SqliteDatabase, InMemoryDatabase>,
     pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase>,
     pub initialization_service: InitializationService<PrismHttpClient>,
 }
@@ -67,6 +69,11 @@ impl AppContext {
         let key_service = KeyService::new(prism_arc.clone(), core_db.clone());
         let messaging_service =
             MessagingService::new(core_db.clone(), ephemeral_db.clone(), apns_gateway_arc);
+
+        // Set up profile service with in-memory implementation for now
+        // In the future, we can update this to use S3 based on settings
+        let profile_service = ProfileService::new(core_db.clone(), ephemeral_db.clone());
+
         let initialization_service = InitializationService::new(prism_arc.clone(), signing_key);
 
         Ok(Self {
@@ -75,6 +82,7 @@ impl AppContext {
             registration_service,
             key_service,
             messaging_service,
+            profile_service,
             initialization_service,
         })
     }
