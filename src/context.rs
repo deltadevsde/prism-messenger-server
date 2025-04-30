@@ -10,7 +10,7 @@ use crate::{
     messages::service::MessagingService,
     notifications::gateway::apns::ApnsNotificationGateway,
     registration::service::RegistrationService,
-    settings::{DatabaseSettings, Settings},
+    settings::{CoreDatabaseSettings, EphemeralDatabaseSettings, Settings},
 };
 
 pub struct AppContext {
@@ -34,8 +34,6 @@ impl AppContext {
         )?;
         let prism_arc = Arc::new(prism);
 
-        let in_memory_db = Arc::new(InMemoryDatabase::new());
-
         // Notifications
         let apns_gateway = ApnsNotificationGateway::from_file(
             &settings.apns.team_id,
@@ -46,21 +44,29 @@ impl AppContext {
         )?;
         let apns_gateway_arc = Arc::new(apns_gateway);
 
-        let DatabaseSettings::Sqlite { path } = &settings.database else {
-            bail!("Unsupported database type");
+        // Core Database
+        let CoreDatabaseSettings::Sqlite { path: core_db_path } = &settings.database.core else {
+            bail!("Unsupported core database type. Only sqlite supported for now");
         };
 
-        let db_pool = create_sqlite_pool(path).await?;
-        let sqlite_db = Arc::new(SqliteDatabase::new(db_pool));
-        sqlite_db.init().await?;
+        let db_pool = create_sqlite_pool(core_db_path).await?;
+        let core_db = Arc::new(SqliteDatabase::new(db_pool));
+        core_db.init().await?;
 
-        let account_service = AccountService::new(prism_arc.clone(), sqlite_db.clone());
-        let auth_service = AuthService::new(sqlite_db.clone());
+        // Ephemeral Database
+        let EphemeralDatabaseSettings::InMemory = &settings.database.ephemeral else {
+            bail!("Unsupported ephemeral database type. Only in-memory supported for now");
+        };
+        let ephemeral_db = Arc::new(InMemoryDatabase::new());
+
+        // Services
+        let account_service = AccountService::new(prism_arc.clone(), core_db.clone());
+        let auth_service = AuthService::new(core_db.clone());
         let registration_service =
-            RegistrationService::new(prism_arc.clone(), sqlite_db.clone(), signing_key.clone());
-        let key_service = KeyService::new(prism_arc.clone(), sqlite_db.clone());
+            RegistrationService::new(prism_arc.clone(), core_db.clone(), signing_key.clone());
+        let key_service = KeyService::new(prism_arc.clone(), core_db.clone());
         let messaging_service =
-            MessagingService::new(sqlite_db.clone(), in_memory_db.clone(), apns_gateway_arc);
+            MessagingService::new(core_db.clone(), ephemeral_db.clone(), apns_gateway_arc);
         let initialization_service = InitializationService::new(prism_arc.clone(), signing_key);
 
         Ok(Self {

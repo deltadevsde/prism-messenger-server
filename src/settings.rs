@@ -30,8 +30,31 @@ pub struct ApnsSettings {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "lowercase")]
-pub enum DatabaseSettings {
+pub enum CoreDatabaseSettings {
+    InMemory,
     Sqlite { path: String },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "lowercase")]
+pub enum EphemeralDatabaseSettings {
+    InMemory,
+    Redis { host: String, port: u16 },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "lowercase")]
+pub enum AssetsDatabaseSettings {
+    InMemory,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DatabaseSettings {
+    pub core: CoreDatabaseSettings,
+    pub ephemeral: EphemeralDatabaseSettings,
+    pub assets: AssetsDatabaseSettings,
 }
 
 // TODO: Defaults for these settings?
