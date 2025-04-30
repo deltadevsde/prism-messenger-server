@@ -48,6 +48,13 @@ pub enum EphemeralDatabaseSettings {
 #[serde(rename_all = "lowercase")]
 pub enum AssetsDatabaseSettings {
     InMemory,
+    S3 {
+        bucket: String,
+        region: String,
+        access_key: String,
+        secret_key: String,
+        endpoint: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]

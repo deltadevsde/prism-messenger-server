@@ -10,6 +10,9 @@ use crate::crypto::salted_hash::SaltedHash;
 use crate::keys::database::KeyDatabase;
 use crate::keys::entities::{KeyBundle, Prekey};
 use crate::keys::error::KeyError;
+use crate::profiles::database::ProfileDatabase;
+use crate::profiles::entities::Profile;
+use crate::profiles::error::ProfileError;
 
 pub struct SqliteDatabase {
     pool: SqlitePool,
@@ -60,6 +63,22 @@ impl SqliteDatabase {
                 key BLOB NOT NULL,
                 PRIMARY KEY (account_id, key_idx),
                 FOREIGN KEY (account_id) REFERENCES key_bundles(account_id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create profiles table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS profiles (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                profile_picture_url TEXT,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (username) REFERENCES accounts(username) ON DELETE CASCADE
             )
             "#,
         )
@@ -375,6 +394,93 @@ impl From<sqlx::Error> for KeyError {
     }
 }
 
+#[async_trait]
+impl ProfileDatabase for SqliteDatabase {
+    async fn get_profile_by_id(&self, id: Uuid) -> Result<Option<Profile>, ProfileError> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, username, display_name, profile_picture_url, updated_at
+            FROM profiles
+            WHERE id = ?
+            "#,
+        )
+        .bind(id.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => {
+                let id_str: String = row.try_get("id")?;
+                let id = Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
+
+                Ok(Some(Profile {
+                    id,
+                    username: row.try_get("username")?,
+                    display_name: row.try_get("display_name")?,
+                    profile_picture_url: row.try_get("profile_picture_url")?,
+                    updated_at: row.try_get::<i64, _>("updated_at")? as u64,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn get_profile_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<Profile>, ProfileError> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, username, display_name, profile_picture_url, updated_at
+            FROM profiles
+            WHERE username = ?
+            "#,
+        )
+        .bind(username)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => {
+                let id_str: String = row.try_get("id")?;
+                let id = Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
+
+                Ok(Some(Profile {
+                    id,
+                    username: row.try_get("username")?,
+                    display_name: row.try_get("display_name")?,
+                    profile_picture_url: row.try_get("profile_picture_url")?,
+                    updated_at: row.try_get::<i64, _>("updated_at")? as u64,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn upsert_profile(&self, profile: Profile) -> Result<Profile, ProfileError> {
+        sqlx::query(
+            r#"
+            INSERT INTO profiles (id, username, display_name, profile_picture_url, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                username = excluded.username,
+                display_name = excluded.display_name,
+                profile_picture_url = excluded.profile_picture_url,
+                updated_at = excluded.updated_at
+            "#,
+        )
+        .bind(profile.id.to_string())
+        .bind(&profile.username)
+        .bind(&profile.display_name)
+        .bind(&profile.profile_picture_url)
+        .bind(profile.updated_at as i64)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(profile)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -585,5 +691,92 @@ mod tests {
             .expect("get_keybundle should not fail for non-existent user");
 
         assert!(non_existent_bundle.is_none(), "Bundle should not exist");
+    }
+    
+    #[tokio::test]
+    async fn test_profile_database_operations() {
+        let pool = create_test_pool().await;
+        let db = SqliteDatabase::new(pool);
+        db.init().await.expect("Failed to initialize database");
+        
+        // First create a test account (needed due to foreign key constraint)
+        let username = "profileuser";
+        let account = Account::new(username.to_string(), "password123", None, None);
+        let account_id = account.id;
+        
+        db.upsert_account(account)
+            .await
+            .expect("Failed to create account");
+        
+        // Create a test profile
+        let profile = Profile {
+            id: account_id,
+            username: username.to_string(),
+            display_name: "Test User".to_string(),
+            profile_picture_url: Some("https://example.com/image.jpg".to_string()),
+            updated_at: 1234567890,
+        };
+        
+        // Test upsert_profile
+        let inserted_profile = db.upsert_profile(profile.clone())
+            .await
+            .expect("Failed to upsert profile");
+        assert_eq!(inserted_profile.id, profile.id);
+        
+        // Test get_profile_by_id
+        let fetched_by_id = db.get_profile_by_id(account_id)
+            .await
+            .expect("Failed to get profile by ID")
+            .expect("Profile should exist");
+        
+        assert_eq!(fetched_by_id.id, profile.id);
+        assert_eq!(fetched_by_id.username, profile.username);
+        assert_eq!(fetched_by_id.display_name, profile.display_name);
+        assert_eq!(fetched_by_id.profile_picture_url, profile.profile_picture_url);
+        assert_eq!(fetched_by_id.updated_at, profile.updated_at);
+        
+        // Test get_profile_by_username
+        let fetched_by_username = db.get_profile_by_username(username)
+            .await
+            .expect("Failed to get profile by username")
+            .expect("Profile should exist");
+        
+        assert_eq!(fetched_by_username.id, profile.id);
+        
+        // Test profile update
+        let updated_profile = Profile {
+            id: account_id,
+            username: username.to_string(),
+            display_name: "Updated Name".to_string(),
+            profile_picture_url: None,
+            updated_at: 9876543210,
+        };
+        
+        db.upsert_profile(updated_profile.clone())
+            .await
+            .expect("Failed to update profile");
+        
+        let fetched_updated = db.get_profile_by_id(account_id)
+            .await
+            .expect("Failed to get updated profile")
+            .expect("Updated profile should exist");
+        
+        assert_eq!(fetched_updated.display_name, "Updated Name");
+        assert_eq!(fetched_updated.profile_picture_url, None);
+        assert_eq!(fetched_updated.updated_at, 9876543210);
+        
+        // Test get non-existent profile
+        let non_existent_id = Uuid::new_v4();
+        let non_existent_result = db.get_profile_by_id(non_existent_id)
+            .await
+            .expect("get_profile_by_id should not fail for non-existent profile");
+        
+        assert!(non_existent_result.is_none(), "Profile should not exist");
+        
+        let non_existent_username_result = db.get_profile_by_username("nonexistentuser")
+            .await
+            .expect("get_profile_by_username should not fail for non-existent profile");
+        
+        assert!(non_existent_username_result.is_none(), "Profile should not exist");
     }
 }

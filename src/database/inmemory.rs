@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::{
@@ -14,12 +14,19 @@ use crate::{
         error::KeyError,
     },
     messages::{database::MessageDatabase, entities::Message, error::MessagingError},
+    profiles::{
+        database::{ProfileDatabase, ProfilePictureStorage},
+        entities::Profile,
+        error::ProfileError,
+    },
 };
 
 pub struct InMemoryDatabase {
     pub accounts: Mutex<HashMap<Uuid, Account>>,
     pub key_bundles: Mutex<HashMap<Uuid, KeyBundle>>,
     pub messages: Mutex<HashMap<Uuid, Vec<Message>>>,
+    pub profiles: RwLock<HashMap<Uuid, Profile>>,
+    pub profile_picture_urls: RwLock<HashMap<Uuid, String>>,
 }
 
 impl InMemoryDatabase {
@@ -28,6 +35,8 @@ impl InMemoryDatabase {
             accounts: Mutex::new(HashMap::new()),
             key_bundles: Mutex::new(HashMap::new()),
             messages: Mutex::new(HashMap::new()),
+            profiles: RwLock::new(HashMap::new()),
+            profile_picture_urls: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -174,5 +183,79 @@ impl MessageDatabase for InMemoryDatabase {
         // Remove any messages whose message_id is in ids
         messages.retain(|msg| !ids.contains(&msg.message_id));
         Ok(messages.len() != original_len)
+    }
+}
+
+#[async_trait]
+impl ProfileDatabase for InMemoryDatabase {
+    async fn get_profile_by_id(&self, id: Uuid) -> Result<Option<Profile>, ProfileError> {
+        let profiles = self
+            .profiles
+            .read()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+        Ok(profiles.get(&id).cloned())
+    }
+
+    async fn get_profile_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<Profile>, ProfileError> {
+        let profiles = self
+            .profiles
+            .read()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        // Find the profile with matching username
+        let matching_profile = profiles
+            .values()
+            .find(|profile| profile.username == username)
+            .cloned();
+        Ok(matching_profile)
+    }
+
+    async fn upsert_profile(&self, profile: Profile) -> Result<Profile, ProfileError> {
+        let mut profiles = self
+            .profiles
+            .write()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        // Store the profile, overwriting any existing profile with the same ID
+        profiles.insert(profile.id, profile.clone());
+
+        Ok(profile)
+    }
+}
+
+#[async_trait]
+impl ProfilePictureStorage for InMemoryDatabase {
+    async fn generate_upload_url(
+        &self,
+        profile_id: Uuid,
+    ) -> Result<(String, String, u64), ProfileError> {
+        // For in-memory, we'll just create URLs that don't actually work,
+        // but would be replaced by real S3 URLs in production
+        let upload_url = format!("https://example.com/upload/{}", profile_id);
+        let picture_url = format!("https://example.com/images/{}", profile_id);
+        let expires_in = 3600; // 1 hour
+
+        // Remember the picture URL for this profile
+        let mut picture_urls = self
+            .profile_picture_urls
+            .write()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+        picture_urls.insert(profile_id, picture_url.clone());
+
+        Ok((upload_url, picture_url, expires_in))
+    }
+
+    async fn delete_profile_picture(&self, profile_id: Uuid) -> Result<(), ProfileError> {
+        let mut picture_urls = self
+            .profile_picture_urls
+            .write()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        picture_urls.remove(&profile_id);
+
+        Ok(())
     }
 }
