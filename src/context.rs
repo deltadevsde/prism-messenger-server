@@ -2,18 +2,18 @@ use anyhow::{Result, bail};
 use prism_client::{PrismHttpClient, SigningKey};
 use std::{path::Path, sync::Arc};
 
-use crate::database::s3::S3Storage;
-use crate::profiles::service::ProfileService;
-use crate::settings::AssetsDatabaseSettings;
 use crate::{
     account::{auth::service::AuthService, service::AccountService},
-    database::{inmemory::InMemoryDatabase, pool::create_sqlite_pool, sqlite::SqliteDatabase},
+    database::{
+        inmemory::InMemoryDatabase, pool::create_sqlite_pool, s3::S3Storage, sqlite::SqliteDatabase,
+    },
     initialization::InitializationService,
     keys::service::KeyService,
     messages::service::MessagingService,
     notifications::gateway::apns::ApnsNotificationGateway,
+    profiles::service::ProfileService,
     registration::service::RegistrationService,
-    settings::{CoreDatabaseSettings, EphemeralDatabaseSettings, Settings},
+    settings::{AssetsDatabaseSettings, CoreDatabaseSettings, EphemeralDatabaseSettings, Settings},
 };
 
 pub struct AppContext {
