@@ -40,7 +40,11 @@ pub enum CoreDatabaseSettings {
 #[serde(rename_all = "lowercase")]
 pub enum EphemeralDatabaseSettings {
     InMemory,
-    Redis { host: String, port: u16 },
+    #[cfg(feature = "redis")]
+    Redis {
+        host: String,
+        port: u16,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
