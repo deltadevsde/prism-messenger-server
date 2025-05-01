@@ -3,6 +3,9 @@ name = "prism-messenger-server"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+redis = []
+
 [dependencies]
 # async
 tokio = { version = "1.16.1", features = ["full"] }
