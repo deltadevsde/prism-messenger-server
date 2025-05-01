@@ -7,7 +7,7 @@ use super::error::ProfileError;
 /// Database operations for user profiles
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
-pub trait ProfileDatabase {
+pub trait ProfileDatabase: Send + Sync {
     /// Get a user profile by ID
     async fn get_profile_by_id(&self, id: Uuid) -> Result<Option<Profile>, ProfileError>;
 
@@ -24,7 +24,7 @@ pub trait ProfileDatabase {
 /// S3 storage operations for profile pictures
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
-pub trait ProfilePictureStorage {
+pub trait ProfilePictureStorage: Send + Sync {
     /// Generate a presigned URL for uploading a profile picture
     ///
     /// Returns:
