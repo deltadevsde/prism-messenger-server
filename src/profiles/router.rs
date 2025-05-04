@@ -7,7 +7,6 @@ use axum::{
 };
 use std::sync::Arc;
 use utoipa_axum::{router::OpenApiRouter, routes};
-use uuid::Uuid;
 
 use super::{
     entities::{Profile, ProfilePictureUploadResponse, UpdateProfileRequest},
@@ -22,7 +21,7 @@ const PROFILES_TAG: &str = "profiles";
 
 pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new()
-        .routes(routes!(get_profile_by_id))
+        .routes(routes!(get_profile))
         .routes(routes!(update_profile))
         .routes(routes!(get_profile_picture_upload_url))
         .layer(from_fn_with_state(context.clone(), require_auth))
@@ -30,7 +29,7 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
 
 #[utoipa::path(
     get,
-    path = "/{id}",
+    path = "/{username}",
     responses(
         (status = 200, description = "Profile fetched successfully", body = Profile),
         (status = 404, description = "Profile not found"),
@@ -38,13 +37,13 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     ),
     tag = PROFILES_TAG
 )]
-async fn get_profile_by_id(
+async fn get_profile(
     State(context): State<Arc<AppContext>>,
-    Path(id): Path<Uuid>,
+    Path(username): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .profile_service
-        .get_profile_by_id(id)
+        .get_profile_by_username(&username)
         .await
         .map(Json)
 }
