@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::Uuid;
 
 use super::database::{ProfileDatabase, ProfilePictureStorage};
 use super::entities::{
@@ -29,38 +28,12 @@ where
         }
     }
 
-    /// Get a profile by ID
-    pub async fn get_profile_by_id(&self, id: Uuid) -> Result<Profile, ProfileError> {
-        match self.profile_db.get_profile_by_id(id).await? {
-            Some(profile) => Ok(profile),
-            None => Err(ProfileError::NotFound),
-        }
-    }
-
     /// Get a profile by username
     pub async fn get_profile_by_username(&self, username: &str) -> Result<Profile, ProfileError> {
         match self.profile_db.get_profile_by_username(username).await? {
             Some(profile) => Ok(profile),
             None => Err(ProfileError::NotFound),
         }
-    }
-
-    /// Create a new profile for a user
-    pub async fn create_profile(&self, username: String) -> Result<Profile, ProfileError> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|e| ProfileError::Internal(e.to_string()))?
-            .as_millis() as u64;
-
-        let profile = Profile {
-            id: Uuid::new_v4(),
-            username: username.clone(),
-            display_name: username,
-            profile_picture_url: None,
-            updated_at: now,
-        };
-
-        self.profile_db.upsert_profile(profile).await
     }
 
     /// Updates a user's profile. If profile picture shall be updated, creates a new upload URL.
