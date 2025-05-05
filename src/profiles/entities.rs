@@ -18,6 +18,30 @@ pub struct Profile {
     pub updated_at: u64,
 }
 
+impl Profile {
+    /// Creates a new profile from a username
+    ///
+    /// Other fields are initialized with default values:
+    /// - id: randomly generated UUID
+    /// - display_name: same as username
+    /// - profile_picture_url: None
+    /// - updated_at: current timestamp in milliseconds
+    pub fn new(username: String) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        Self {
+            id: Uuid::new_v4(),
+            display_name: username.clone(),
+            username,
+            profile_picture_url: None,
+            updated_at: now,
+        }
+    }
+}
+
 /// Actions that can be performed on a profile picture
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
