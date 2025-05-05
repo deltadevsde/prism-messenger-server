@@ -74,11 +74,11 @@ impl SqliteDatabase {
             r#"
             CREATE TABLE IF NOT EXISTS profiles (
                 id TEXT PRIMARY KEY,
-                username TEXT NOT NULL UNIQUE,
+                account_id TEXT NOT NULL UNIQUE,
                 display_name TEXT NOT NULL,
                 profile_picture_url TEXT,
                 updated_at INTEGER NOT NULL,
-                FOREIGN KEY (username) REFERENCES accounts(username) ON DELETE CASCADE
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
             )
             "#,
         )
@@ -399,7 +399,7 @@ impl ProfileDatabase for SqliteDatabase {
     async fn get_profile_by_id(&self, id: Uuid) -> Result<Option<Profile>, ProfileError> {
         let row = sqlx::query(
             r#"
-            SELECT id, username, display_name, profile_picture_url, updated_at
+            SELECT id, account_id, display_name, profile_picture_url, updated_at
             FROM profiles
             WHERE id = ?
             "#,
@@ -414,9 +414,13 @@ impl ProfileDatabase for SqliteDatabase {
                 let id =
                     Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
 
+                let account_id_str: String = row.try_get("account_id")?;
+                let account_id = Uuid::parse_str(&account_id_str)
+                    .map_err(|e| ProfileError::Internal(e.to_string()))?;
+
                 Ok(Some(Profile {
                     id,
-                    username: row.try_get("username")?,
+                    account_id,
                     display_name: row.try_get("display_name")?,
                     profile_picture_url: row.try_get("profile_picture_url")?,
                     updated_at: row.try_get::<i64, _>("updated_at")? as u64,
@@ -426,18 +430,18 @@ impl ProfileDatabase for SqliteDatabase {
         }
     }
 
-    async fn get_profile_by_username(
+    async fn get_profile_by_account_id(
         &self,
-        username: &str,
+        account_id: Uuid,
     ) -> Result<Option<Profile>, ProfileError> {
         let row = sqlx::query(
             r#"
-            SELECT id, username, display_name, profile_picture_url, updated_at
+            SELECT id, account_id, display_name, profile_picture_url, updated_at
             FROM profiles
-            WHERE username = ?
+            WHERE account_id = ?
             "#,
         )
-        .bind(username)
+        .bind(account_id.to_string())
         .fetch_optional(&self.pool)
         .await?;
 
@@ -447,9 +451,13 @@ impl ProfileDatabase for SqliteDatabase {
                 let id =
                     Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
 
+                let account_id_str: String = row.try_get("account_id")?;
+                let account_id = Uuid::parse_str(&account_id_str)
+                    .map_err(|e| ProfileError::Internal(e.to_string()))?;
+
                 Ok(Some(Profile {
                     id,
-                    username: row.try_get("username")?,
+                    account_id,
                     display_name: row.try_get("display_name")?,
                     profile_picture_url: row.try_get("profile_picture_url")?,
                     updated_at: row.try_get::<i64, _>("updated_at")? as u64,
@@ -462,17 +470,17 @@ impl ProfileDatabase for SqliteDatabase {
     async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError> {
         sqlx::query(
             r#"
-            INSERT INTO profiles (id, username, display_name, profile_picture_url, updated_at)
+            INSERT INTO profiles (id, account_id, display_name, profile_picture_url, updated_at)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
-                username = excluded.username,
+                account_id = excluded.account_id,
                 display_name = excluded.display_name,
                 profile_picture_url = excluded.profile_picture_url,
                 updated_at = excluded.updated_at
             "#,
         )
         .bind(profile.id.to_string())
-        .bind(&profile.username)
+        .bind(profile.account_id.to_string())
         .bind(&profile.display_name)
         .bind(&profile.profile_picture_url)
         .bind(profile.updated_at as i64)
@@ -712,8 +720,8 @@ mod tests {
 
         // Create a test profile
         let profile = Profile {
-            id: account_id,
-            username: username.to_string(),
+            id: Uuid::new_v4(),
+            account_id,
             display_name: "Test User".to_string(),
             profile_picture_url: Some("https://example.com/image.jpg".to_string()),
             updated_at: 1234567890,
@@ -725,13 +733,13 @@ mod tests {
 
         // Test get_profile_by_id
         let fetched_by_id = db
-            .get_profile_by_id(account_id)
+            .get_profile_by_id(profile.id)
             .await
             .expect("Failed to get profile by ID")
             .expect("Profile should exist");
 
         assert_eq!(fetched_by_id.id, profile.id);
-        assert_eq!(fetched_by_id.username, profile.username);
+        assert_eq!(fetched_by_id.account_id, profile.account_id);
         assert_eq!(fetched_by_id.display_name, profile.display_name);
         assert_eq!(
             fetched_by_id.profile_picture_url,
@@ -739,19 +747,19 @@ mod tests {
         );
         assert_eq!(fetched_by_id.updated_at, profile.updated_at);
 
-        // Test get_profile_by_username
-        let fetched_by_username = db
-            .get_profile_by_username(username)
+        // Test get_profile_by_account_id
+        let fetched_by_account_id = db
+            .get_profile_by_account_id(account_id)
             .await
-            .expect("Failed to get profile by username")
+            .expect("Failed to get profile by account_id")
             .expect("Profile should exist");
 
-        assert_eq!(fetched_by_username.id, profile.id);
+        assert_eq!(fetched_by_account_id.id, profile.id);
 
         // Test profile update
         let updated_profile = Profile {
-            id: account_id,
-            username: username.to_string(),
+            id: profile.id,
+            account_id,
             display_name: "Updated Name".to_string(),
             profile_picture_url: None,
             updated_at: 9876543210,
@@ -762,7 +770,7 @@ mod tests {
             .expect("Failed to update profile");
 
         let fetched_updated = db
-            .get_profile_by_id(account_id)
+            .get_profile_by_id(profile.id)
             .await
             .expect("Failed to get updated profile")
             .expect("Updated profile should exist");
@@ -770,6 +778,10 @@ mod tests {
         assert_eq!(fetched_updated.display_name, "Updated Name");
         assert_eq!(fetched_updated.profile_picture_url, None);
         assert_eq!(fetched_updated.updated_at, 9876543210);
+        assert_eq!(
+            fetched_updated.account_id, account_id,
+            "account_id should match the original account"
+        );
 
         // Test get non-existent profile
         let non_existent_id = Uuid::new_v4();
@@ -780,13 +792,14 @@ mod tests {
 
         assert!(non_existent_result.is_none(), "Profile should not exist");
 
-        let non_existent_username_result = db
-            .get_profile_by_username("nonexistentuser")
+        let non_existent_account_id = Uuid::new_v4();
+        let non_existent_account_result = db
+            .get_profile_by_account_id(non_existent_account_id)
             .await
-            .expect("get_profile_by_username should not fail for non-existent profile");
+            .expect("get_profile_by_account_id should not fail for non-existent profile");
 
         assert!(
-            non_existent_username_result.is_none(),
+            non_existent_account_result.is_none(),
             "Profile should not exist"
         );
 

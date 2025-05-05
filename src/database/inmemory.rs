@@ -196,19 +196,19 @@ impl ProfileDatabase for InMemoryDatabase {
         Ok(profiles.get(&id).cloned())
     }
 
-    async fn get_profile_by_username(
+    async fn get_profile_by_account_id(
         &self,
-        username: &str,
+        account_id: Uuid,
     ) -> Result<Option<Profile>, ProfileError> {
         let profiles = self
             .profiles
             .read()
             .map_err(|e| ProfileError::Database(e.to_string()))?;
 
-        // Find the profile with matching username
+        // Find the profile with matching account_id
         let matching_profile = profiles
             .values()
-            .find(|profile| profile.username == username)
+            .find(|profile| profile.account_id == account_id)
             .cloned();
         Ok(matching_profile)
     }
