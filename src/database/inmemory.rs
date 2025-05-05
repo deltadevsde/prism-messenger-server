@@ -213,7 +213,7 @@ impl ProfileDatabase for InMemoryDatabase {
         Ok(matching_profile)
     }
 
-    async fn upsert_profile(&self, profile: Profile) -> Result<Profile, ProfileError> {
+    async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError> {
         let mut profiles = self
             .profiles
             .write()
@@ -222,7 +222,7 @@ impl ProfileDatabase for InMemoryDatabase {
         // Store the profile, overwriting any existing profile with the same ID
         profiles.insert(profile.id, profile.clone());
 
-        Ok(profile)
+        Ok(())
     }
 }
 
