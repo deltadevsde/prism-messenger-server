@@ -8,8 +8,8 @@ use uuid::Uuid;
 pub struct Profile {
     /// UUID of the profile
     pub id: Uuid,
-    /// Username of the profile owner
-    pub username: String,
+    /// UUID of the associated account
+    pub account_id: Uuid,
     /// Display name of the user
     pub display_name: String,
     /// URL to the profile picture, if one exists
@@ -19,14 +19,13 @@ pub struct Profile {
 }
 
 impl Profile {
-    /// Creates a new profile from a username
+    /// Creates a new profile with an account ID and display name
     ///
     /// Other fields are initialized with default values:
     /// - id: randomly generated UUID
-    /// - display_name: same as username
     /// - profile_picture_url: None
     /// - updated_at: current timestamp in milliseconds
-    pub fn new(username: String) -> Self {
+    pub fn new(account_id: Uuid, display_name: String) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -34,8 +33,8 @@ impl Profile {
 
         Self {
             id: Uuid::new_v4(),
-            display_name: username.clone(),
-            username,
+            account_id,
+            display_name,
             profile_picture_url: None,
             updated_at: now,
         }

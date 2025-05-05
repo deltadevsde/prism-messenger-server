@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use uuid::Uuid;
+
 use super::database::{ProfileDatabase, ProfilePictureStorage};
 use super::entities::{
     Profile, ProfilePictureAction, ProfilePictureUploadResponse, UpdateProfileRequest,
@@ -28,9 +30,16 @@ where
         }
     }
 
-    /// Get a profile by username
-    pub async fn get_profile_by_username(&self, username: &str) -> Result<Profile, ProfileError> {
-        match self.profile_db.get_profile_by_username(username).await? {
+    /// Get a profile by account ID
+    pub async fn get_profile_by_account_id(
+        &self,
+        account_id: Uuid,
+    ) -> Result<Profile, ProfileError> {
+        match self
+            .profile_db
+            .get_profile_by_account_id(account_id)
+            .await?
+        {
             Some(profile) => Ok(profile),
             None => Err(ProfileError::NotFound),
         }
@@ -39,11 +48,15 @@ where
     /// Updates a user's profile. If profile picture shall be updated, creates a new upload URL.
     pub async fn update_profile(
         &self,
-        username: &str,
+        account_id: Uuid,
         update_req: UpdateProfileRequest,
     ) -> Result<Option<ProfilePictureUploadResponse>, ProfileError> {
         // Get the existing profile
-        let mut profile = match self.profile_db.get_profile_by_username(username).await? {
+        let mut profile = match self
+            .profile_db
+            .get_profile_by_account_id(account_id)
+            .await?
+        {
             Some(profile) => profile,
             None => return Err(ProfileError::NotFound),
         };
@@ -113,10 +126,14 @@ where
     /// Generate a pre-signed URL for uploading a profile picture
     pub async fn generate_profile_picture_upload_url(
         &self,
-        username: &str,
+        account_id: Uuid,
     ) -> Result<ProfilePictureUploadResponse, ProfileError> {
         // Get the profile to ensure it exists and to get the ID
-        let profile = match self.profile_db.get_profile_by_username(username).await? {
+        let profile = match self
+            .profile_db
+            .get_profile_by_account_id(account_id)
+            .await?
+        {
             Some(profile) => profile,
             None => return Err(ProfileError::NotFound),
         };

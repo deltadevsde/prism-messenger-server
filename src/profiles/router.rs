@@ -7,6 +7,7 @@ use axum::{
 };
 use std::sync::Arc;
 use utoipa_axum::{router::OpenApiRouter, routes};
+use uuid::Uuid;
 
 use super::{
     entities::{Profile, ProfilePictureUploadResponse, UpdateProfileRequest},
@@ -29,7 +30,7 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
 
 #[utoipa::path(
     get,
-    path = "/{username}",
+    path = "/{account_id}",
     responses(
         (status = 200, description = "Profile fetched successfully", body = Profile),
         (status = 404, description = "Profile not found"),
@@ -39,11 +40,11 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
 )]
 async fn get_profile(
     State(context): State<Arc<AppContext>>,
-    Path(username): Path<String>,
+    Path(account_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .profile_service
-        .get_profile_by_username(&username)
+        .get_profile_by_account_id(account_id)
         .await
         .map(Json)
 }
@@ -68,7 +69,7 @@ async fn update_profile(
 ) -> Result<impl IntoResponse, ProfileError> {
     let upload_response = context
         .profile_service
-        .update_profile(&account.username, req)
+        .update_profile(account.id, req)
         .await?;
 
     // Return 204 when no profile picture update, or 200 with upload info
@@ -95,7 +96,7 @@ async fn get_profile_picture_upload_url(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .profile_service
-        .generate_profile_picture_upload_url(&account.username)
+        .generate_profile_picture_upload_url(account.id)
         .await
         .map(Json)
 }
