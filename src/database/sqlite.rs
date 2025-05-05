@@ -411,7 +411,8 @@ impl ProfileDatabase for SqliteDatabase {
         match row {
             Some(row) => {
                 let id_str: String = row.try_get("id")?;
-                let id = Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
+                let id =
+                    Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
 
                 Ok(Some(Profile {
                     id,
@@ -443,7 +444,8 @@ impl ProfileDatabase for SqliteDatabase {
         match row {
             Some(row) => {
                 let id_str: String = row.try_get("id")?;
-                let id = Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
+                let id =
+                    Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
 
                 Ok(Some(Profile {
                     id,
@@ -457,7 +459,7 @@ impl ProfileDatabase for SqliteDatabase {
         }
     }
 
-    async fn upsert_profile(&self, profile: Profile) -> Result<Profile, ProfileError> {
+    async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError> {
         sqlx::query(
             r#"
             INSERT INTO profiles (id, username, display_name, profile_picture_url, updated_at)
@@ -477,7 +479,7 @@ impl ProfileDatabase for SqliteDatabase {
         .execute(&self.pool)
         .await?;
 
-        Ok(profile)
+        Ok(())
     }
 }
 
@@ -692,22 +694,22 @@ mod tests {
 
         assert!(non_existent_bundle.is_none(), "Bundle should not exist");
     }
-    
+
     #[tokio::test]
     async fn test_profile_database_operations() {
         let pool = create_test_pool().await;
         let db = SqliteDatabase::new(pool);
         db.init().await.expect("Failed to initialize database");
-        
+
         // First create a test account (needed due to foreign key constraint)
         let username = "profileuser";
         let account = Account::new(username.to_string(), "password123", None, None);
         let account_id = account.id;
-        
+
         db.upsert_account(account)
             .await
             .expect("Failed to create account");
-        
+
         // Create a test profile
         let profile = Profile {
             id: account_id,
@@ -716,33 +718,36 @@ mod tests {
             profile_picture_url: Some("https://example.com/image.jpg".to_string()),
             updated_at: 1234567890,
         };
-        
-        // Test upsert_profile
-        let inserted_profile = db.upsert_profile(profile.clone())
+
+        db.upsert_profile(profile.clone())
             .await
-            .expect("Failed to upsert profile");
-        assert_eq!(inserted_profile.id, profile.id);
-        
+            .expect("Failed to insert profile");
+
         // Test get_profile_by_id
-        let fetched_by_id = db.get_profile_by_id(account_id)
+        let fetched_by_id = db
+            .get_profile_by_id(account_id)
             .await
             .expect("Failed to get profile by ID")
             .expect("Profile should exist");
-        
+
         assert_eq!(fetched_by_id.id, profile.id);
         assert_eq!(fetched_by_id.username, profile.username);
         assert_eq!(fetched_by_id.display_name, profile.display_name);
-        assert_eq!(fetched_by_id.profile_picture_url, profile.profile_picture_url);
+        assert_eq!(
+            fetched_by_id.profile_picture_url,
+            profile.profile_picture_url
+        );
         assert_eq!(fetched_by_id.updated_at, profile.updated_at);
-        
+
         // Test get_profile_by_username
-        let fetched_by_username = db.get_profile_by_username(username)
+        let fetched_by_username = db
+            .get_profile_by_username(username)
             .await
             .expect("Failed to get profile by username")
             .expect("Profile should exist");
-        
+
         assert_eq!(fetched_by_username.id, profile.id);
-        
+
         // Test profile update
         let updated_profile = Profile {
             id: account_id,
@@ -751,32 +756,53 @@ mod tests {
             profile_picture_url: None,
             updated_at: 9876543210,
         };
-        
+
         db.upsert_profile(updated_profile.clone())
             .await
             .expect("Failed to update profile");
-        
-        let fetched_updated = db.get_profile_by_id(account_id)
+
+        let fetched_updated = db
+            .get_profile_by_id(account_id)
             .await
             .expect("Failed to get updated profile")
             .expect("Updated profile should exist");
-        
+
         assert_eq!(fetched_updated.display_name, "Updated Name");
         assert_eq!(fetched_updated.profile_picture_url, None);
         assert_eq!(fetched_updated.updated_at, 9876543210);
-        
+
         // Test get non-existent profile
         let non_existent_id = Uuid::new_v4();
-        let non_existent_result = db.get_profile_by_id(non_existent_id)
+        let non_existent_result = db
+            .get_profile_by_id(non_existent_id)
             .await
             .expect("get_profile_by_id should not fail for non-existent profile");
-        
+
         assert!(non_existent_result.is_none(), "Profile should not exist");
-        
-        let non_existent_username_result = db.get_profile_by_username("nonexistentuser")
+
+        let non_existent_username_result = db
+            .get_profile_by_username("nonexistentuser")
             .await
             .expect("get_profile_by_username should not fail for non-existent profile");
-        
-        assert!(non_existent_username_result.is_none(), "Profile should not exist");
+
+        assert!(
+            non_existent_username_result.is_none(),
+            "Profile should not exist"
+        );
+
+        // Test cascade delete - check that deleting an account removes the profile
+        db.remove_account(account_id)
+            .await
+            .expect("Failed to remove account");
+
+        let profile_after_account_deletion = db
+            .get_profile_by_id(account_id)
+            .await
+            .expect("get_profile_by_id should not fail after account deletion");
+
+        assert!(
+            profile_after_account_deletion.is_none(),
+            "Profile should be deleted when account is deleted (due to CASCADE constraint)"
+        );
     }
 }

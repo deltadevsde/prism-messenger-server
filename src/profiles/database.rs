@@ -18,7 +18,7 @@ pub trait ProfileDatabase: Send + Sync {
     ) -> Result<Option<Profile>, ProfileError>;
 
     /// Create or update a profile
-    async fn upsert_profile(&self, profile: Profile) -> Result<Profile, ProfileError>;
+    async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError>;
 }
 
 /// S3 storage operations for profile pictures
