@@ -56,12 +56,15 @@ where
         // Store the action for later use
         let action = update_req.profile_picture_action.clone();
 
+        // Variable to store upload response if needed
+        let mut upload_response = None;
+
         // Handle profile picture action
         match &action {
             ProfilePictureAction::NoChange => {
                 // Do nothing with the profile picture
             }
-            ProfilePictureAction::Clear | ProfilePictureAction::Update => {
+            ProfilePictureAction::Clear => {
                 // If there was a previous picture, delete it
                 if profile.profile_picture_url.is_some() {
                     self.picture_storage
@@ -69,7 +72,28 @@ where
                         .await?;
                 }
                 profile.profile_picture_url = None;
-                // For Update action, the actual update will happen when the client uploads a new picture
+            }
+            ProfilePictureAction::Update => {
+                // If there was a previous picture, delete it
+                if profile.profile_picture_url.is_some() {
+                    self.picture_storage
+                        .delete_profile_picture(profile.id)
+                        .await?;
+                }
+
+                // Generate upload URL once and use it for both updating profile and returning to client
+                let (upload_url, picture_url, expires_in) =
+                    self.picture_storage.generate_upload_url(profile.id).await?;
+
+                // Update profile with the new picture URL
+                profile.profile_picture_url = Some(picture_url.clone());
+
+                // Store the response for later return
+                upload_response = Some(ProfilePictureUploadResponse {
+                    upload_url,
+                    picture_url,
+                    expires_in,
+                });
             }
         }
 
@@ -82,20 +106,8 @@ where
         // Save the updated profile
         self.profile_db.upsert_profile(profile.clone()).await?;
 
-        // Return the appropriate response based on the action
-        match action {
-            ProfilePictureAction::NoChange | ProfilePictureAction::Clear => {
-                // Return None when profile picture is not being updated
-                Ok(None)
-            }
-            ProfilePictureAction::Update => {
-                // Return upload URL when profile picture is being updated
-                let upload_info = self
-                    .generate_profile_picture_upload_url_from_profile(&profile)
-                    .await?;
-                Ok(Some(upload_info))
-            }
-        }
+        // Return the upload response if available
+        Ok(upload_response)
     }
 
     /// Generate a pre-signed URL for uploading a profile picture
