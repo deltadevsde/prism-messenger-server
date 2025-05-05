@@ -1,7 +1,7 @@
 use axum::{http::StatusCode, response::IntoResponse};
 use prism_client::{PrismApiError, TransactionError};
 
-use crate::account::database::AccountDatabaseError;
+use crate::{account::database::AccountDatabaseError, profiles::error::ProfileError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RegistrationError {
@@ -25,6 +25,12 @@ impl From<PrismApiError> for RegistrationError {
 
 impl From<AccountDatabaseError> for RegistrationError {
     fn from(err: AccountDatabaseError) -> Self {
+        Self::ProcessingFailed(err.to_string())
+    }
+}
+
+impl From<ProfileError> for RegistrationError {
+    fn from(err: ProfileError) -> Self {
         Self::ProcessingFailed(err.to_string())
     }
 }
