@@ -64,7 +64,7 @@ impl ProfilePictureStorage for S3Storage {
         &self,
         profile_id: Uuid,
     ) -> Result<(String, String, u64), ProfileError> {
-        let object_key = format!("profile-pictures/{}.jpg", profile_id);
+        let object_key = format!("profiles/{}/profile.jpg", profile_id);
         let expires_in = 300; // 5 minutes in seconds
 
         // Create a presigned PUT URL for uploading
