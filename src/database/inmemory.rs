@@ -19,7 +19,7 @@ use crate::{
 pub struct InMemoryDatabase {
     pub accounts: Mutex<HashMap<Uuid, Account>>,
     pub key_bundles: Mutex<HashMap<String, KeyBundle>>,
-    pub messages: Mutex<HashMap<String, Vec<Message>>>,
+    pub messages: Mutex<HashMap<Uuid, Vec<Message>>>,
 }
 
 impl InMemoryDatabase {
@@ -44,32 +44,30 @@ impl AccountDatabase for InMemoryDatabase {
         Ok(())
     }
 
-    async fn fetch_account(&self, id: Uuid) -> Result<Account, AccountDatabaseError> {
+    async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError> {
         let account_lock = self
             .accounts
             .lock()
             .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-        account_lock
-            .get(&id)
-            .cloned()
-            .ok_or(AccountDatabaseError::NotFound(id.to_string()))
+        let account = account_lock.get(&id).cloned();
+        Ok(account)
     }
 
     async fn fetch_account_by_username(
         &self,
         username: &str,
-    ) -> Result<Account, AccountDatabaseError> {
+    ) -> Result<Option<Account>, AccountDatabaseError> {
         let account_lock = self
             .accounts
             .lock()
             .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-        account_lock
+        let account = account_lock
             .values()
             .find(|account| account.username == username)
-            .cloned()
-            .ok_or(AccountDatabaseError::OperationFailed)
+            .cloned();
+        Ok(account)
     }
 
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
@@ -92,9 +90,9 @@ impl AccountDatabase for InMemoryDatabase {
             .lock()
             .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-        let account = account_lock
-            .get_mut(&id)
-            .ok_or(AccountDatabaseError::NotFound(id.to_string()))?;
+        let Some(mut account) = account_lock.get_mut(&id) else {
+            return Err(AccountDatabaseError::OperationFailed);
+        };
 
         account.apns_token = Some(token);
         Ok(())
@@ -147,28 +145,28 @@ impl MessageDatabase for InMemoryDatabase {
             MessagingError::DatabaseError(format!("Lock poisoned during message storage: {}", e))
         })?;
         messages_lock
-            .entry(message.recipient_username.clone())
+            .entry(message.recipient_id)
             .or_insert_with(Vec::new)
             .push(message);
         Ok(true)
     }
 
-    fn get_messages(&self, username: &str) -> Result<Vec<Message>, MessagingError> {
+    fn get_messages(&self, account_id: Uuid) -> Result<Vec<Message>, MessagingError> {
         let messages_lock = self.messages.lock().map_err(|e| {
             MessagingError::DatabaseError(format!("Lock poisoned during message retrieval: {}", e))
         })?;
         // Return a cloned vector of messages (if any) so that users can work on their own copy.
-        Ok(messages_lock.get(username).cloned().unwrap_or_default())
+        Ok(messages_lock.get(&account_id).cloned().unwrap_or_default())
     }
 
-    fn mark_delivered(&self, username: &str, ids: Vec<uuid::Uuid>) -> Result<bool, MessagingError> {
+    fn mark_delivered(&self, account_id: Uuid, ids: Vec<Uuid>) -> Result<bool, MessagingError> {
         let mut messages_lock = self.messages.lock().map_err(|e| {
             MessagingError::DatabaseError(format!(
                 "Lock poisoned during message delivery status update: {}",
                 e
             ))
         })?;
-        let Some(messages) = messages_lock.get_mut(username) else {
+        let Some(messages) = messages_lock.get_mut(&account_id) else {
             return Ok(false);
         };
 
