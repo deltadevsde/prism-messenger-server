@@ -47,9 +47,9 @@ pub struct MessageReceipt {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
-    pub message_id: uuid::Uuid,
-    pub sender_username: String,
-    pub recipient_username: String,
+    pub message_id: Uuid,
+    pub sender_id: Uuid,
+    pub recipient_id: Uuid,
     pub message: DoubleRatchetMessage,
     pub timestamp: u64,
 }
