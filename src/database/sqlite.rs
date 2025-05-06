@@ -70,6 +70,20 @@ impl SqliteDatabase {
     }
 }
 
+// ACCOUNTS
+
+impl From<sqlx::Error> for AccountDatabaseError {
+    fn from(_: sqlx::Error) -> Self {
+        AccountDatabaseError::OperationFailed
+    }
+}
+
+impl From<uuid::Error> for AccountDatabaseError {
+    fn from(_: uuid::Error) -> Self {
+        AccountDatabaseError::OperationFailed
+    }
+}
+
 #[async_trait]
 impl AccountDatabase for SqliteDatabase {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError> {
@@ -90,13 +104,12 @@ impl AccountDatabase for SqliteDatabase {
         .bind(account.apns_token.as_deref())
         .bind(account.gcm_token.as_deref())
         .execute(&self.pool)
-        .await
-        .map_err(|_| AccountDatabaseError::OperationFailed)?;
+        .await?;
 
         Ok(())
     }
 
-    async fn fetch_account(&self, id: Uuid) -> Result<Account, AccountDatabaseError> {
+    async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError> {
         let row = sqlx::query(
             r#"
             SELECT id, username, auth_password_hash, apns_token, gcm_token
@@ -106,44 +119,29 @@ impl AccountDatabase for SqliteDatabase {
         )
         .bind(id.to_string())
         .fetch_optional(&self.pool)
-        .await
-        .map_err(|_| AccountDatabaseError::OperationFailed)?;
+        .await?;
 
-        match row {
-            Some(row) => {
-                let salted_hash = row
-                    .try_get("auth_password_hash")
-                    .map_err(|_| AccountDatabaseError::OperationFailed)
-                    .map(SaltedHash::new)?;
+        row.map(|row| {
+            let salted_hash = row.try_get("auth_password_hash").map(SaltedHash::new)?;
 
-                let id_str: String = row
-                    .try_get("id")
-                    .map_err(|_| AccountDatabaseError::OperationFailed)?;
-                let id =
-                    Uuid::parse_str(&id_str).map_err(|_| AccountDatabaseError::OperationFailed)?;
+            let id_str: String = row.try_get("id")?;
+            let id = Uuid::parse_str(&id_str)?;
 
-                Ok(Account {
-                    id,
-                    username: row
-                        .try_get("username")
-                        .map_err(|_| AccountDatabaseError::OperationFailed)?,
-                    auth_password_hash: salted_hash,
-                    apns_token: row
-                        .try_get("apns_token")
-                        .map_err(|_| AccountDatabaseError::OperationFailed)?,
-                    gcm_token: row
-                        .try_get("gcm_token")
-                        .map_err(|_| AccountDatabaseError::OperationFailed)?,
-                })
-            }
-            None => Err(AccountDatabaseError::NotFound(id.to_string())),
-        }
+            Ok(Account {
+                id,
+                username: row.try_get("username")?,
+                auth_password_hash: salted_hash,
+                apns_token: row.try_get("apns_token")?,
+                gcm_token: row.try_get("gcm_token")?,
+            })
+        })
+        .transpose()
     }
 
     async fn fetch_account_by_username(
         &self,
         username: &str,
-    ) -> Result<Account, AccountDatabaseError> {
+    ) -> Result<Option<Account>, AccountDatabaseError> {
         let row = sqlx::query(
             r#"
             SELECT id, username, auth_password_hash, apns_token, gcm_token
@@ -153,38 +151,25 @@ impl AccountDatabase for SqliteDatabase {
         )
         .bind(username)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(|_| AccountDatabaseError::OperationFailed)?;
+        .await?;
 
-        match row {
-            Some(row) => {
-                let salted_hash = row
-                    .try_get("auth_password_hash")
-                    .map_err(|_| AccountDatabaseError::OperationFailed)
-                    .map(SaltedHash::new)?;
+        row.map(|row| {
+            let salted_hash = row.try_get("auth_password_hash").map(SaltedHash::new)?;
 
-                let id_str: String = row
-                    .try_get("id")
-                    .map_err(|_| AccountDatabaseError::OperationFailed)?;
-                let id =
-                    Uuid::parse_str(&id_str).map_err(|_| AccountDatabaseError::OperationFailed)?;
+            let id_str: String = row
+                .try_get("id")
+                .map_err(|_| AccountDatabaseError::OperationFailed)?;
+            let id = Uuid::parse_str(&id_str).map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-                Ok(Account {
-                    id,
-                    username: row
-                        .try_get("username")
-                        .map_err(|_| AccountDatabaseError::OperationFailed)?,
-                    auth_password_hash: salted_hash,
-                    apns_token: row
-                        .try_get("apns_token")
-                        .map_err(|_| AccountDatabaseError::OperationFailed)?,
-                    gcm_token: row
-                        .try_get("gcm_token")
-                        .map_err(|_| AccountDatabaseError::OperationFailed)?,
-                })
-            }
-            None => Err(AccountDatabaseError::NotFound(username.to_string())),
-        }
+            Ok(Account {
+                id,
+                username: row.try_get("username")?,
+                auth_password_hash: salted_hash,
+                apns_token: row.try_get("apns_token")?,
+                gcm_token: row.try_get("gcm_token")?,
+            })
+        })
+        .transpose()
     }
 
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
@@ -422,14 +407,16 @@ mod tests {
         let fetched = db
             .fetch_account(account_id)
             .await
-            .expect("Failed to fetch account");
+            .expect("Failed to fetch account")
+            .expect("Account should exist");
         assert_eq!(fetched.username, "testuser");
 
         // Test fetch_account_by_username
         let fetched_by_username = db
             .fetch_account_by_username("testuser")
             .await
-            .expect("Failed to fetch account by username");
+            .expect("Failed to fetch account by username")
+            .expect("Account should exist");
         assert_eq!(fetched_by_username.id, account_id);
 
         // Test remove_account
@@ -438,13 +425,14 @@ mod tests {
             .expect("Failed to remove account");
 
         // Verify the account was removed
-        let result = db.fetch_account(account_id).await;
-        assert!(result.is_err());
-        if let Err(AccountDatabaseError::NotFound(id)) = result {
-            assert_eq!(id, account_id.to_string());
-        } else {
-            panic!("Expected AccountDatabaseError::NotFound");
-        }
+        let result = db
+            .fetch_account(account_id)
+            .await
+            .expect("Failed to fetch account");
+        assert!(
+            result.is_none(),
+            "Account result should be None after deletion"
+        );
     }
 
     #[tokio::test]
@@ -472,7 +460,8 @@ mod tests {
         let updated_account = db
             .fetch_account(account_id)
             .await
-            .expect("Failed to fetch updated account");
+            .expect("Failed to fetch updated account")
+            .expect("Account should exist");
         assert_eq!(updated_account.apns_token, Some(new_token));
 
         // Test updating non-existent account
