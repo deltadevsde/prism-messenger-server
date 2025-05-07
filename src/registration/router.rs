@@ -13,6 +13,7 @@ use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{account::auth::header::AuthHeader, context::AppContext};
+use uuid::Uuid;
 
 use super::entities::RegistrationChallenge;
 
@@ -56,6 +57,12 @@ pub struct FinalizeRegistrationRequest {
     pub gcm_token: Option<Vec<u8>>,
 }
 
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FinalizeRegistrationResponse {
+    pub id: Uuid,
+}
+
 pub fn router() -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new()
         .routes(routes!(post_request_registration))
@@ -75,12 +82,13 @@ pub fn router() -> OpenApiRouter<Arc<AppContext>> {
 async fn post_request_registration(
     State(context): State<Arc<AppContext>>,
     Json(req): Json<RequestRegistrationRequest>,
-) -> Result<Json<RequestRegistrationResponse>, StatusCode> {
-    let challenge = context
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    context
         .registration_service
         .request_registration(req.username, req.key)
-        .await?;
-    Ok(Json(challenge.into()))
+        .await
+        .map(RequestRegistrationResponse::from)
+        .map(Json)
 }
 
 #[utoipa::path(
@@ -97,7 +105,7 @@ async fn post_finalize_registration(
     State(context): State<Arc<AppContext>>,
     headers: HeaderMap,
     Json(req): Json<FinalizeRegistrationRequest>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     // Basic auth header is used to set the new account's auth token
     let auth_header_str = headers
         .get("Authorization")
@@ -121,12 +129,6 @@ async fn post_finalize_registration(
             req.gcm_token,
         )
         .await
-    {
-        Ok(_) => (),
-        Err(e) => {
-            tracing::error!("Failed to finalize registration: {:?}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    }
-    Ok(())
+        .map(|new_acc| FinalizeRegistrationResponse { id: new_acc.id })
+        .map(Json)
 }
