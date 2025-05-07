@@ -1,10 +1,5 @@
 use anyhow::Result;
-use axum::{
-    Json,
-    extract::State,
-    http::{HeaderMap, StatusCode},
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, response::IntoResponse};
 use prism_client::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as};
@@ -12,10 +7,10 @@ use std::sync::Arc;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::{account::auth::header::AuthHeader, context::AppContext};
 use uuid::Uuid;
 
 use super::entities::RegistrationChallenge;
+use crate::context::AppContext;
 
 const REGISTRATION_TAG: &str = "registration";
 
@@ -49,6 +44,8 @@ pub struct FinalizeRegistrationRequest {
     pub username: String,
     pub key: VerifyingKey,
     pub signature: Signature,
+    #[schema(example = "MDEyMzQ1Njc4OWFiY2RlZg==")]
+    pub auth_password: String,
     #[schema(example = "device-token-for-apns")]
     #[serde_as(as = "Option<Base64>")]
     pub apns_token: Option<Vec<u8>>,
@@ -103,28 +100,16 @@ async fn post_request_registration(
 )]
 async fn post_finalize_registration(
     State(context): State<Arc<AppContext>>,
-    headers: HeaderMap,
     Json(req): Json<FinalizeRegistrationRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    // Basic auth header is used to set the new account's auth token
-    let auth_header_str = headers
-        .get("Authorization")
-        .and_then(|header| header.to_str().ok())
-        .ok_or(StatusCode::BAD_REQUEST)?;
 
-    let auth_header = AuthHeader::parse(auth_header_str).map_err(|_| StatusCode::BAD_REQUEST)?;
-
-    if auth_header.username != req.username {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    match context
+    context
         .registration_service
         .finalize_registration(
             req.username,
             req.key,
             req.signature,
-            &auth_header.password,
+            &req.auth_password,
             req.apns_token,
             req.gcm_token,
         )
