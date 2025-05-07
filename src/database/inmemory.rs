@@ -18,7 +18,7 @@ use crate::{
 
 pub struct InMemoryDatabase {
     pub accounts: Mutex<HashMap<Uuid, Account>>,
-    pub key_bundles: Mutex<HashMap<String, KeyBundle>>,
+    pub key_bundles: Mutex<HashMap<Uuid, KeyBundle>>,
     pub messages: Mutex<HashMap<Uuid, Vec<Message>>>,
 }
 
@@ -90,7 +90,7 @@ impl AccountDatabase for InMemoryDatabase {
             .lock()
             .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-        let Some(mut account) = account_lock.get_mut(&id) else {
+        let Some(account) = account_lock.get_mut(&id) else {
             return Err(AccountDatabaseError::OperationFailed);
         };
 
@@ -103,38 +103,38 @@ impl AccountDatabase for InMemoryDatabase {
 impl KeyDatabase for InMemoryDatabase {
     async fn insert_keybundle(
         &self,
-        username: &str,
+        account_id: Uuid,
         key_bundle: KeyBundle,
     ) -> Result<(), KeyError> {
         let mut kb_lock = self
             .key_bundles
             .lock()
             .map_err(|_| KeyError::DatabaseError("Lock poisoned".to_string()))?;
-        kb_lock.insert(username.to_string(), key_bundle);
+        kb_lock.insert(account_id, key_bundle);
         Ok(())
     }
 
-    async fn get_keybundle(&self, username: &str) -> Result<Option<KeyBundle>, KeyError> {
+    async fn get_keybundle(&self, account_id: Uuid) -> Result<Option<KeyBundle>, KeyError> {
         let kb_lock = self
             .key_bundles
             .lock()
             .map_err(|_| KeyError::DatabaseError("Lock poisoned".to_string()))?;
         // Return a clone of the key bundle if it exists.
-        Ok(kb_lock.get(username).cloned())
+        Ok(kb_lock.get(&account_id).cloned())
     }
 
-    async fn add_prekeys(&self, username: &str, prekeys: Vec<Prekey>) -> Result<(), KeyError> {
+    async fn add_prekeys(&self, account_id: Uuid, prekeys: Vec<Prekey>) -> Result<(), KeyError> {
         let mut kb_lock = self
             .key_bundles
             .lock()
             .map_err(|_| KeyError::DatabaseError("Lock poisoned".to_string()))?;
 
-        if let Some(bundle) = kb_lock.get_mut(username) {
+        if let Some(bundle) = kb_lock.get_mut(&account_id) {
             // TODO: Ensure no duplicate prekey ids are added.
             bundle.prekeys.extend(prekeys);
             Ok(())
         } else {
-            Err(KeyError::NotFound(username.to_string()))
+            Err(KeyError::NotFound(account_id.to_string()))
         }
     }
 }

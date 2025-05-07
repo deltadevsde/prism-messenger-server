@@ -9,6 +9,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
+use uuid::Uuid;
 
 use super::{
     entities::{KeyBundle, Prekey},
@@ -58,7 +59,7 @@ async fn post_keybundle(
 ) -> Result<StatusCode, impl IntoResponse> {
     context
         .key_service
-        .upload_key_bundle(&account.username, req.key_bundle)
+        .upload_key_bundle(account.id, req.key_bundle)
         .await
         .map(|_| StatusCode::OK)
 }
@@ -80,16 +81,16 @@ async fn post_prekeys(
 ) -> Result<StatusCode, impl IntoResponse> {
     context
         .key_service
-        .add_prekeys(&account.username, req.prekeys)
+        .add_prekeys(account.id, req.prekeys)
         .await
         .map(|_| StatusCode::OK)
 }
 
 #[utoipa::path(
     get,
-    path = "/bundle/{username}",
+    path = "/bundle/{account_id}",
     params(
-        ("username" = String, Path, description = "User identifier")
+        ("account_id" = Uuid, Path, description = "Account ID")
     ),
     responses(
         (status = 200, description = "Key bundle retrieved successfully", body = KeyBundleResponse),
@@ -99,11 +100,11 @@ async fn post_prekeys(
 )]
 async fn get_keybundle(
     State(context): State<Arc<AppContext>>,
-    Path(username): Path<String>,
+    Path(account_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, StatusCode> {
     context
         .key_service
-        .get_keybundle(&username)
+        .get_keybundle(account_id)
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)

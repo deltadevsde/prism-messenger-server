@@ -41,7 +41,7 @@ impl SqliteDatabase {
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS key_bundles (
-                username TEXT PRIMARY KEY,
+                account_id BLOB PRIMARY KEY,
                 identity_key BLOB NOT NULL,
                 signed_prekey BLOB NOT NULL,
                 signed_prekey_signature BLOB NOT NULL
@@ -55,11 +55,11 @@ impl SqliteDatabase {
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS prekeys (
-                username TEXT NOT NULL,
+                account_id BLOB NOT NULL,
                 key_idx INTEGER NOT NULL,
                 key BLOB NOT NULL,
-                PRIMARY KEY (username, key_idx),
-                FOREIGN KEY (username) REFERENCES key_bundles(username) ON DELETE CASCADE
+                PRIMARY KEY (account_id, key_idx),
+                FOREIGN KEY (account_id) REFERENCES key_bundles(account_id) ON DELETE CASCADE
             )
             "#,
         )
@@ -215,12 +215,12 @@ impl AccountDatabase for SqliteDatabase {
 
 #[async_trait]
 impl KeyDatabase for SqliteDatabase {
-    async fn insert_keybundle(&self, user_id: &str, key_bundle: KeyBundle) -> Result<(), KeyError> {
+    async fn insert_keybundle(&self, account_id: Uuid, key_bundle: KeyBundle) -> Result<(), KeyError> {
         let mut tx = self.pool.begin().await?;
 
         // First, delete any existing key bundle and prekeys for this user
-        sqlx::query("DELETE FROM key_bundles WHERE username = ?")
-            .bind(user_id)
+        sqlx::query("DELETE FROM key_bundles WHERE account_id = ?")
+            .bind(account_id)
             .execute(&mut *tx)
             .await?;
 
@@ -232,11 +232,11 @@ impl KeyDatabase for SqliteDatabase {
         // Insert the new key bundle
         sqlx::query(
             r#"
-            INSERT INTO key_bundles (username, identity_key, signed_prekey, signed_prekey_signature)
+            INSERT INTO key_bundles (account_id, identity_key, signed_prekey, signed_prekey_signature)
             VALUES (?, ?, ?, ?)
             "#,
         )
-        .bind(user_id)
+        .bind(account_id)
         .bind(identity_key_bytes)
         .bind(signed_prekey_bytes)
         .bind(signature_bytes)
@@ -249,11 +249,11 @@ impl KeyDatabase for SqliteDatabase {
 
             sqlx::query(
                 r#"
-                INSERT INTO prekeys (username, key_idx, key)
+                INSERT INTO prekeys (account_id, key_idx, key)
                 VALUES (?, ?, ?)
                 "#,
             )
-            .bind(user_id)
+            .bind(account_id)
             .bind(prekey.key_idx as i64) // SQLite uses i64 for INTEGER
             .bind(prekey_bytes)
             .execute(&mut *tx)
@@ -268,16 +268,16 @@ impl KeyDatabase for SqliteDatabase {
         Ok(())
     }
 
-    async fn get_keybundle(&self, user_id: &str) -> Result<Option<KeyBundle>, KeyError> {
+    async fn get_keybundle(&self, account_id: Uuid) -> Result<Option<KeyBundle>, KeyError> {
         // First, check if the key bundle exists
         let key_bundle_row = sqlx::query(
             r#"
             SELECT identity_key, signed_prekey, signed_prekey_signature
             FROM key_bundles
-            WHERE username = ?
+            WHERE account_id = ?
             "#,
         )
-        .bind(user_id)
+        .bind(account_id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -299,10 +299,10 @@ impl KeyDatabase for SqliteDatabase {
                 r#"
                 SELECT key_idx, key
                 FROM prekeys
-                WHERE username = ?
+                WHERE account_id = ?
                 "#,
             )
-            .bind(user_id)
+            .bind(account_id)
             .fetch_all(&self.pool)
             .await?;
 
@@ -329,16 +329,16 @@ impl KeyDatabase for SqliteDatabase {
         }
     }
 
-    async fn add_prekeys(&self, user_id: &str, prekeys: Vec<Prekey>) -> Result<(), KeyError> {
+    async fn add_prekeys(&self, account_id: Uuid, prekeys: Vec<Prekey>) -> Result<(), KeyError> {
         // Check if the key bundle exists
-        let exists = sqlx::query("SELECT COUNT(*) as count FROM key_bundles WHERE username = ?")
-            .bind(user_id)
+        let exists = sqlx::query("SELECT COUNT(*) as count FROM key_bundles WHERE account_id = ?")
+            .bind(account_id)
             .fetch_one(&self.pool)
             .await?;
 
         let count: i64 = exists.get("count");
         if count == 0 {
-            return Err(KeyError::NotFound(user_id.to_string()));
+            return Err(KeyError::NotFound(account_id.to_string()));
         }
 
         let mut conn = self.pool.acquire().await?;
@@ -350,13 +350,13 @@ impl KeyDatabase for SqliteDatabase {
 
             sqlx::query(
                 r#"
-                INSERT INTO prekeys (username, key_idx, key)
+                INSERT INTO prekeys (account_id, key_idx, key)
                 VALUES (?, ?, ?)
-                ON CONFLICT(username, key_idx) DO UPDATE SET
+                ON CONFLICT(account_id, key_idx) DO UPDATE SET
                     key = excluded.key
                 "#,
             )
-            .bind(user_id)
+            .bind(account_id)
             .bind(prekey.key_idx as i64)
             .bind(prekey_bytes)
             .execute(&mut *tx)
@@ -483,7 +483,7 @@ mod tests {
         let db = SqliteDatabase::new(pool);
         db.init().await.expect("Failed to initialize database");
 
-        let username = "keyuser";
+        let account_id = Uuid::new_v4();
 
         // Create a test key bundle
         let identity_signing_key = SigningKey::new_ed25519();
@@ -509,13 +509,13 @@ mod tests {
         };
 
         // Test inserting a key bundle
-        db.insert_keybundle(username, key_bundle)
+        db.insert_keybundle(account_id, key_bundle)
             .await
             .expect("Failed to insert key bundle");
 
         // Test retrieving the key bundle
         let retrieved_bundle = db
-            .get_keybundle(username)
+            .get_keybundle(account_id)
             .await
             .expect("Failed to get key bundle")
             .expect("Key bundle should exist");
@@ -543,13 +543,13 @@ mod tests {
 
         let additional_prekeys = vec![prekey3.clone(), prekey4.clone()];
 
-        db.add_prekeys(username, additional_prekeys)
+        db.add_prekeys(account_id, additional_prekeys)
             .await
             .expect("Failed to add prekeys");
 
         // Verify the updated bundle has all prekeys
         let updated_bundle = db
-            .get_keybundle(username)
+            .get_keybundle(account_id)
             .await
             .expect("Failed to get updated key bundle")
             .expect("Updated key bundle should exist");
@@ -560,10 +560,10 @@ mod tests {
         assert_eq!(updated_bundle.prekeys[3], prekey4);
 
         // Test adding prekeys for non-existent user
-        let non_existent_user = "nonexistentuser";
+        let non_existent_account_id = Uuid::new_v4();
         let result = db
             .add_prekeys(
-                non_existent_user,
+                non_existent_account_id,
                 vec![Prekey {
                     key_idx: 1,
                     key: SigningKey::new_ed25519().verifying_key(),
@@ -573,14 +573,14 @@ mod tests {
 
         assert!(result.is_err());
         if let Err(KeyError::NotFound(user)) = result {
-            assert_eq!(user, non_existent_user);
+            assert_eq!(user, non_existent_account_id.to_string());
         } else {
             panic!("Expected KeyError::NotFound");
         }
 
         // Test getting a non-existent key bundle
         let non_existent_bundle = db
-            .get_keybundle(non_existent_user)
+            .get_keybundle(non_existent_account_id)
             .await
             .expect("get_keybundle should not fail for non-existent user");
 
