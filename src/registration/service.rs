@@ -6,7 +6,7 @@ use tracing::{debug, error, info, instrument};
 use super::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
     PRISM_MESSENGER_SERVICE_ID,
-    account::{database::AccountDatabase, entities::Account},
+    account::{database::AccountDatabase, entities::{Account, AccountIdentity}},
 };
 
 pub struct RegistrationService<P, D>
@@ -89,7 +89,7 @@ where
             .await?;
 
         info!(username, "Successfully created account on prism");
-        let account = Account::new(username, auth_password, apns_token, gcm_token);
+        let account = Account::new(AccountIdentity::Username(username), auth_password, apns_token, gcm_token);
 
         debug!(?account, "Saving created account in local database");
         self.account_database

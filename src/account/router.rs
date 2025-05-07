@@ -12,7 +12,7 @@ use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-use crate::account::entities::Account;
+use crate::account::entities::{Account, AccountIdentity};
 use crate::context::AppContext;
 
 use super::auth::middleware::require_auth;
@@ -60,11 +60,12 @@ async fn head_account(
     Path(username): Path<String>,
     State(context): State<Arc<AppContext>>,
 ) -> StatusCode {
-    let Ok(username_exists) = context.account_service.username_exists(&username).await else {
+    let identity = AccountIdentity::Username(username);
+    let Ok(identity_exists) = context.account_service.identity_exists(&identity).await else {
         return StatusCode::INTERNAL_SERVER_ERROR;
     };
 
-    match username_exists {
+    match identity_exists {
         true => StatusCode::OK,
         false => StatusCode::NOT_FOUND,
     }
@@ -82,12 +83,13 @@ async fn head_account(
     )
 )]
 async fn get_account(
-    Path(username_hash): Path<String>,
+    Path(username): Path<String>,
     State(context): State<Arc<AppContext>>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
+    let identity = AccountIdentity::Username(username);
     context
         .account_service
-        .get_account_id_by_username(&username_hash)
+        .get_account_id_by_identity(&identity)
         .await
         .map(|id| AccountInfoResponse { id })
         .map(Json)
