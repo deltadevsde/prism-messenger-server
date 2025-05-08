@@ -1,4 +1,4 @@
-use axum::http::StatusCode;
+use axum::{http::StatusCode, response::IntoResponse};
 use prism_client::{PrismApiError, TransactionError};
 
 use crate::account::database::AccountDatabaseError;
@@ -29,11 +29,12 @@ impl From<AccountDatabaseError> for RegistrationError {
     }
 }
 
-impl From<RegistrationError> for StatusCode {
-    fn from(err: RegistrationError) -> Self {
-        match err {
+impl IntoResponse for RegistrationError {
+    fn into_response(self) -> axum::response::Response {
+        let status = match self {
             RegistrationError::MissingPushToken => StatusCode::BAD_REQUEST,
             RegistrationError::ProcessingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        }
+        };
+        status.into_response()
     }
 }

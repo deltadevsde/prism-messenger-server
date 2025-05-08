@@ -3,6 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::{
     account::{
@@ -22,14 +23,16 @@ impl<D: AccountDatabase> AuthService<D> {
         Self { account_db }
     }
 
-    /// Authenticates a user by username and password
-    pub async fn authenticate(&self, username: &str, password: &str) -> Result<Account, AuthError> {
-        // Look up the account by username
+    /// Authenticates an account ID and password
+    pub async fn authenticate(&self, id: &str, password: &str) -> Result<Account, AuthError> {
+        let account_id = Uuid::parse_str(id)?;
+
+        // Look up the account
         let account = self
             .account_db
-            .fetch_account_by_username(username)
-            .await
-            .map_err(|_| AuthError::InvalidCredentials)?;
+            .fetch_account(account_id)
+            .await?
+            .ok_or(AuthError::InvalidCredentials)?;
 
         // Verify the password against stored hash
         account.auth_password_hash.verify_password(password)?;
@@ -47,6 +50,12 @@ pub enum AuthError {
 
     #[error("Database error: {0}")]
     DatabaseError(#[from] AccountDatabaseError),
+}
+
+impl From<uuid::Error> for AuthError {
+    fn from(_: uuid::Error) -> Self {
+        AuthError::InvalidCredentials
+    }
 }
 
 impl From<SaltedHashError> for AuthError {

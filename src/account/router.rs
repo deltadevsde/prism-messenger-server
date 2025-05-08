@@ -10,6 +10,7 @@ use serde_with::{base64::Base64, serde_as};
 use std::sync::Arc;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
+use uuid::Uuid;
 
 use crate::account::entities::Account;
 use crate::context::AppContext;
@@ -27,9 +28,17 @@ pub struct ApnsTokenUpdateRequest {
     pub token: Vec<u8>,
 }
 
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct AccountInfoResponse {
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
+    pub id: Uuid,
+}
+
 pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     let public_router = OpenApiRouter::new().routes(routes!(head_account));
     let auth_router = OpenApiRouter::new()
+        .routes(routes!(get_account))
         .routes(routes!(update_apns_token))
         .layer(from_fn_with_state(context.clone(), require_auth));
 
@@ -40,7 +49,7 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     head,
     path = "/account/{username}",
     tag = ACCOUNTS_TAG,
-    params(("id" = String, Path, description = "Account identifier")),
+    params(("username" = String, Path, description = "Username of the account")),
     responses(
         (status = 200, description = "Account exists"),
         (status = 404, description = "Account not found"),
@@ -59,6 +68,29 @@ async fn head_account(
         true => StatusCode::OK,
         false => StatusCode::NOT_FOUND,
     }
+}
+
+#[utoipa::path(
+    get,
+    path = "/account/{username}",
+    tag = ACCOUNTS_TAG,
+    params(("username" = String, Path, description = "Username of the account")),
+    responses(
+        (status = 200, description = "Account found", body = AccountInfoResponse),
+        (status = 404, description = "Account not found"),
+        (status = 500, description = "Internal error while getting account")
+    )
+)]
+async fn get_account(
+    Path(username_hash): Path<String>,
+    State(context): State<Arc<AppContext>>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    context
+        .account_service
+        .get_account_id_by_username(&username_hash)
+        .await
+        .map(|id| AccountInfoResponse { id })
+        .map(Json)
 }
 
 #[utoipa::path(

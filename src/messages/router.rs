@@ -21,7 +21,7 @@ const MESSAGING_TAG: &str = "messaging";
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SendMessageRequest {
-    pub recipient_username: String,
+    pub recipient_id: Uuid,
     pub message: DoubleRatchetMessage,
 }
 
@@ -57,7 +57,7 @@ async fn send_message(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
-        .send_message(account.username, req.recipient_username, req.message)
+        .send_message(account.id, req.recipient_id, req.message)
         .await
         .map(Json)
 }
@@ -78,7 +78,7 @@ async fn fetch_messages(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
-        .get_messages(&account.username)
+        .get_messages(account.id)
         .await
         .map(Json)
 }
@@ -101,7 +101,7 @@ async fn mark_delivered(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
-        .mark_delivered(&account.username, request.message_ids)
+        .mark_delivered(account.id, request.message_ids)
         .await
         .map(Json)
 }

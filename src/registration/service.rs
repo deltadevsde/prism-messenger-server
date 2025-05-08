@@ -5,7 +5,8 @@ use tracing::{debug, error, info, instrument};
 
 use super::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
-    PRISM_MESSENGER_SERVICE_ID, account::database::AccountDatabase, account::entities::Account,
+    PRISM_MESSENGER_SERVICE_ID,
+    account::{database::AccountDatabase, entities::Account},
 };
 
 pub struct RegistrationService<P, D>
@@ -61,7 +62,7 @@ where
         auth_password: &str,
         apns_token: Option<Vec<u8>>,
         gcm_token: Option<Vec<u8>>,
-    ) -> Result<(), RegistrationError> {
+    ) -> Result<Account, RegistrationError> {
         debug!("Starting registration finalization");
 
         if apns_token.is_none() && gcm_token.is_none() {
@@ -93,11 +94,11 @@ where
         debug!(?account, "Saving created account in local database");
         self.account_database
             .clone()
-            .upsert_account(account)
+            .upsert_account(account.clone())
             .await?;
 
         info!("Registration completed successfully");
-        Ok(())
+        Ok(account)
     }
 }
 

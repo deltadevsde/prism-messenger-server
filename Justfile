@@ -10,7 +10,7 @@ build:
 
 try:
   @echo "Running the project..."
-  RUST_BACKTRACE=full RUST_LOG="trace,ctclient::internal=off,reqwest=off,sp1_stark=info,jmt=off,p3_dft=off,p3_fri=off,sp1_core_executor=info,sp1_recursion_program=info,p3_merkle_tree=off,sp1_recursion_compiler=off,sp1_core_machine=off" cargo run
+  RUST_BACKTRACE=1 RUST_LOG="debug,hyper=info,sqlx=info,aws=info" cargo run --release
 
 unit-test:
   @echo "Running unit tests..."
