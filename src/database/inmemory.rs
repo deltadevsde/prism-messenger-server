@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     account::{
         database::{AccountDatabase, AccountDatabaseError},
-        entities::Account,
+        entities::{Account, AccountIdentity},
     },
     keys::{
         database::KeyDatabase,
@@ -54,9 +54,9 @@ impl AccountDatabase for InMemoryDatabase {
         Ok(account)
     }
 
-    async fn fetch_account_by_username(
+    async fn fetch_account_by_identity(
         &self,
-        username: &str,
+        identity: &AccountIdentity,
     ) -> Result<Option<Account>, AccountDatabaseError> {
         let account_lock = self
             .accounts
@@ -65,7 +65,7 @@ impl AccountDatabase for InMemoryDatabase {
 
         let account = account_lock
             .values()
-            .find(|account| account.username == username)
+            .find(|account| account.identities.contains(identity))
             .cloned();
         Ok(account)
     }

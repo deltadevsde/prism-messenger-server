@@ -5,7 +5,7 @@ use sqlx::{Acquire, Row, SqlitePool};
 use uuid::Uuid;
 
 use crate::account::database::{AccountDatabase, AccountDatabaseError};
-use crate::account::entities::Account;
+use crate::account::entities::{Account, AccountIdentity};
 use crate::crypto::salted_hash::SaltedHash;
 use crate::keys::database::KeyDatabase;
 use crate::keys::entities::{KeyBundle, Prekey};
@@ -27,10 +27,24 @@ impl SqliteDatabase {
             r#"
             CREATE TABLE IF NOT EXISTS accounts (
                 id TEXT PRIMARY KEY,
-                username TEXT NOT NULL UNIQUE,
                 auth_password_hash TEXT NOT NULL,
                 apns_token BLOB,
                 gcm_token BLOB
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create identities table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS identities (
+                account_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                value TEXT NOT NULL,
+                PRIMARY KEY (type, value),
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
             )
             "#,
         )
@@ -84,35 +98,99 @@ impl From<uuid::Error> for AccountDatabaseError {
     }
 }
 
+impl SqliteDatabase {
+    // Helper method to fetch all identities for an account
+    async fn fetch_identities(
+        &self,
+        account_id: Uuid,
+    ) -> Result<Vec<AccountIdentity>, AccountDatabaseError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT type, value
+            FROM identities
+            WHERE account_id = ?
+            "#,
+        )
+        .bind(account_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut identities = Vec::new();
+        for row in rows {
+            let identity_type: String = row.try_get("type")?;
+            let identity_value: String = row.try_get("value")?;
+
+            match identity_type.as_str() {
+                "username" => identities.push(AccountIdentity::Username(identity_value)),
+                _ => {} // Ignore unknown identity types for forward compatibility
+            }
+        }
+
+        Ok(identities)
+    }
+}
+
 #[async_trait]
 impl AccountDatabase for SqliteDatabase {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError> {
+        let mut tx = self.pool.begin().await?;
+
+        // Insert or update account information
         sqlx::query(
             r#"
-            INSERT INTO accounts (id, username, auth_password_hash, apns_token, gcm_token)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, auth_password_hash, apns_token, gcm_token)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
-                username = excluded.username,
                 auth_password_hash = excluded.auth_password_hash,
                 apns_token = excluded.apns_token,
                 gcm_token = excluded.gcm_token
             "#,
         )
         .bind(account.id.to_string())
-        .bind(&account.username)
         .bind(account.auth_password_hash.to_string())
         .bind(account.apns_token.as_deref())
         .bind(account.gcm_token.as_deref())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
 
+        // Delete existing identities for this account
+        sqlx::query(
+            r#"
+            DELETE FROM identities
+            WHERE account_id = ?
+            "#,
+        )
+        .bind(account.id.to_string())
+        .execute(&mut *tx)
+        .await?;
+
+        // Insert new identities
+        for identity in account.identities {
+            match identity {
+                AccountIdentity::Username(username) => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO identities (account_id, type, value)
+                        VALUES (?, ?, ?)
+                        "#,
+                    )
+                    .bind(account.id.to_string())
+                    .bind("username")
+                    .bind(username)
+                    .execute(&mut *tx)
+                    .await?;
+                }
+            }
+        }
+
+        tx.commit().await?;
         Ok(())
     }
-
     async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError> {
-        let row = sqlx::query(
+        // First, get the basic account information
+        let account_row = sqlx::query(
             r#"
-            SELECT id, username, auth_password_hash, apns_token, gcm_token
+            SELECT id, auth_password_hash, apns_token, gcm_token
             FROM accounts
             WHERE id = ?
             "#,
@@ -121,55 +199,56 @@ impl AccountDatabase for SqliteDatabase {
         .fetch_optional(&self.pool)
         .await?;
 
-        row.map(|row| {
+        if let Some(row) = account_row {
             let salted_hash = row.try_get("auth_password_hash").map(SaltedHash::new)?;
-
             let id_str: String = row.try_get("id")?;
-            let id = Uuid::parse_str(&id_str)?;
+            let account_id = Uuid::parse_str(&id_str)?;
 
-            Ok(Account {
-                id,
-                username: row.try_get("username")?,
+            // Then, get all identities for this account
+            let identities = self.fetch_identities(account_id).await?;
+
+            Ok(Some(Account {
+                id: account_id,
+                identities,
                 auth_password_hash: salted_hash,
                 apns_token: row.try_get("apns_token")?,
                 gcm_token: row.try_get("gcm_token")?,
-            })
-        })
-        .transpose()
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
-    async fn fetch_account_by_username(
+    async fn fetch_account_by_identity(
         &self,
-        username: &str,
+        identity: &AccountIdentity,
     ) -> Result<Option<Account>, AccountDatabaseError> {
-        let row = sqlx::query(
+        let (identity_type, identity_value) = match identity {
+            AccountIdentity::Username(username) => ("username", username),
+        };
+
+        // Find the account ID associated with this identity
+        let account_id_row = sqlx::query(
             r#"
-            SELECT id, username, auth_password_hash, apns_token, gcm_token
-            FROM accounts
-            WHERE username = ?
+            SELECT account_id
+            FROM identities
+            WHERE type = ? AND value = ?
             "#,
         )
-        .bind(username)
+        .bind(identity_type)
+        .bind(identity_value)
         .fetch_optional(&self.pool)
         .await?;
 
-        row.map(|row| {
-            let salted_hash = row.try_get("auth_password_hash").map(SaltedHash::new)?;
+        if let Some(row) = account_id_row {
+            let id_str: String = row.try_get("account_id")?;
+            let account_id = Uuid::parse_str(&id_str)?;
 
-            let id_str: String = row
-                .try_get("id")
-                .map_err(|_| AccountDatabaseError::OperationFailed)?;
-            let id = Uuid::parse_str(&id_str).map_err(|_| AccountDatabaseError::OperationFailed)?;
-
-            Ok(Account {
-                id,
-                username: row.try_get("username")?,
-                auth_password_hash: salted_hash,
-                apns_token: row.try_get("apns_token")?,
-                gcm_token: row.try_get("gcm_token")?,
-            })
-        })
-        .transpose()
+            // Fetch the full account using the ID
+            self.fetch_account(account_id).await
+        } else {
+            Ok(None)
+        }
     }
 
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
@@ -215,7 +294,11 @@ impl AccountDatabase for SqliteDatabase {
 
 #[async_trait]
 impl KeyDatabase for SqliteDatabase {
-    async fn insert_keybundle(&self, account_id: Uuid, key_bundle: KeyBundle) -> Result<(), KeyError> {
+    async fn insert_keybundle(
+        &self,
+        account_id: Uuid,
+        key_bundle: KeyBundle,
+    ) -> Result<(), KeyError> {
         let mut tx = self.pool.begin().await?;
 
         // First, delete any existing key bundle and prekeys for this user
@@ -377,6 +460,8 @@ impl From<sqlx::Error> for KeyError {
 
 #[cfg(test)]
 mod tests {
+    use crate::account::entities::AccountIdentity;
+
     use super::*;
     use prism_client::SigningKey;
     use sqlx::sqlite::SqlitePoolOptions;
@@ -395,7 +480,12 @@ mod tests {
         db.init().await.expect("Failed to initialize database");
 
         // Create a test account
-        let account = Account::new("testuser".to_string(), "password123", None, None);
+        let account = Account::new(
+            AccountIdentity::Username("testuser".to_string()),
+            "password123",
+            None,
+            None,
+        );
         let account_id = account.id;
 
         // Test upsert_account
@@ -409,15 +499,19 @@ mod tests {
             .await
             .expect("Failed to fetch account")
             .expect("Account should exist");
-        assert_eq!(fetched.username, "testuser");
 
-        // Test fetch_account_by_username
-        let fetched_by_username = db
-            .fetch_account_by_username("testuser")
+        // Check that we got the right identity back
+        let AccountIdentity::Username(username) = &fetched.identities[0];
+        assert_eq!(username, "testuser");
+
+        // Test fetch_account_by_identity
+        let identity = AccountIdentity::Username("testuser".to_string());
+        let fetched_by_identity = db
+            .fetch_account_by_identity(&identity)
             .await
-            .expect("Failed to fetch account by username")
+            .expect("Failed to fetch account by identity")
             .expect("Account should exist");
-        assert_eq!(fetched_by_username.id, account_id);
+        assert_eq!(fetched_by_identity.id, account_id);
 
         // Test remove_account
         db.remove_account(account_id)
@@ -442,17 +536,22 @@ mod tests {
         db.init().await.expect("Failed to initialize database");
 
         // Create a test account
-        let account = Account::new("apnsuser".to_string(), "password123", None, None);
+        let account = Account::new(
+            AccountIdentity::Username("testuser".to_string()),
+            "password123",
+            None,
+            None,
+        );
         let account_id = account.id;
 
-        // Insert the account
-        db.upsert_account(account)
+        // Test upsert_account
+        db.upsert_account(account.clone())
             .await
             .expect("Failed to upsert account");
 
-        // Update the APNS token
-        let new_token = vec![1, 2, 3, 4, 5];
-        db.update_apns_token(account_id, new_token.clone())
+        // Test updating apns_token
+        let token = vec![1, 2, 3, 4, 5];
+        db.update_apns_token(account_id, token.clone())
             .await
             .expect("Failed to update APNS token");
 
@@ -460,16 +559,17 @@ mod tests {
         let updated_account = db
             .fetch_account(account_id)
             .await
-            .expect("Failed to fetch updated account")
+            .expect("Failed to fetch account")
             .expect("Account should exist");
-        assert_eq!(updated_account.apns_token, Some(new_token));
+        assert_eq!(updated_account.apns_token, Some(token));
 
         // Test updating non-existent account
         let non_existent_id = Uuid::new_v4();
-        let result = db
-            .update_apns_token(non_existent_id, vec![5, 6, 7, 8])
-            .await;
-        assert!(result.is_err());
+        let result = db.update_apns_token(non_existent_id, vec![1, 2, 3]).await;
+        assert!(
+            result.is_err(),
+            "Update should fail for non-existent account"
+        );
         if let Err(AccountDatabaseError::NotFound(id)) = result {
             assert_eq!(id, non_existent_id.to_string());
         } else {

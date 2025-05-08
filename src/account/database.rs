@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use super::entities::Account;
+use super::entities::{Account, AccountIdentity};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AccountDatabaseError {
@@ -16,9 +16,9 @@ pub enum AccountDatabaseError {
 pub trait AccountDatabase {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError>;
     async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError>;
-    async fn fetch_account_by_username(
+    async fn fetch_account_by_identity(
         &self,
-        username: &str,
+        identity: &AccountIdentity,
     ) -> Result<Option<Account>, AccountDatabaseError>;
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError>;
     async fn update_apns_token(&self, id: Uuid, token: Vec<u8>)

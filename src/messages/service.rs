@@ -103,7 +103,7 @@ mod tests {
     use super::MessagingService;
     use crate::account::{
         database::{AccountDatabase, MockAccountDatabase},
-        entities::Account,
+        entities::{Account, AccountIdentity},
     };
     use crate::database::inmemory::InMemoryDatabase;
     use crate::messages::{
@@ -240,14 +240,14 @@ mod tests {
         let db = InMemoryDatabase::new();
 
         let alice_account = Account::new(
-            ALICE_USERNAME.to_string(),
+            AccountIdentity::Username(ALICE_USERNAME.to_string()),
             "alice_auth_password",
             Some(ALICE_PUSH_TOKEN.to_vec()),
             None,
         );
 
         let bob_account = Account::new(
-            BOB_USERNAME.to_string(),
+            AccountIdentity::Username(BOB_USERNAME.to_string()),
             "bob_auth_password",
             Some(BOB_PUSH_TOKEN.to_vec()),
             None,
@@ -352,7 +352,7 @@ mod tests {
             .times(1)
             .returning(|_| {
                 Ok(Some(Account::new(
-                    "recipient".to_string(),
+                    AccountIdentity::Username("recipient".to_string()),
                     "password",
                     Some(vec![1, 2, 3, 4]), // Device token
                     None,
