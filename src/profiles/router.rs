@@ -10,7 +10,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
 use super::{
-    entities::{Profile, ProfilePictureUploadResponse, UpdateProfileRequest},
+    entities::{ProfilePictureUploadResponse, ProfileResponse, UpdateProfileRequest},
     error::ProfileError,
 };
 use crate::{
@@ -23,16 +23,18 @@ const PROFILES_TAG: &str = "profiles";
 pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     OpenApiRouter::new()
         .routes(routes!(get_profile))
+        .routes(routes!(get_profile_by_username))
         .routes(routes!(update_profile))
         .routes(routes!(get_profile_picture_upload_url))
         .layer(from_fn_with_state(context.clone(), require_auth))
+        .with_state(context)
 }
 
 #[utoipa::path(
     get,
     path = "/{account_id}",
     responses(
-        (status = 200, description = "Profile fetched successfully", body = Profile),
+        (status = 200, description = "Profile fetched successfully", body = ProfileResponse),
         (status = 404, description = "Profile not found"),
         (status = 500, description = "Internal server error")
     ),
@@ -44,7 +46,28 @@ async fn get_profile(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .profile_service
-        .get_profile_by_account_id(account_id)
+        .get_profile_response_by_account_id(account_id)
+        .await
+        .map(Json)
+}
+
+#[utoipa::path(
+    get,
+    path = "/by-username/{username}",
+    responses(
+        (status = 200, description = "Profile fetched successfully", body = ProfileResponse),
+        (status = 404, description = "Profile not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = PROFILES_TAG
+)]
+async fn get_profile_by_username(
+    State(context): State<Arc<AppContext>>,
+    Path(username): Path<String>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    context
+        .profile_service
+        .get_profile_response_by_username(&username)
         .await
         .map(Json)
 }
@@ -73,7 +96,7 @@ async fn update_profile(
         .await?;
 
     // Return 204 when no profile picture update, or 200 with upload info
-    let Some(upload_info) = upload_response else {
+    let Some(upload_info): Option<ProfilePictureUploadResponse> = upload_response else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
 
@@ -93,7 +116,7 @@ async fn update_profile(
 async fn get_profile_picture_upload_url(
     State(context): State<Arc<AppContext>>,
     Extension(account): Extension<Account>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
+) -> Result<Json<ProfilePictureUploadResponse>, ProfileError> {
     context
         .profile_service
         .generate_profile_picture_upload_url(account.id)
