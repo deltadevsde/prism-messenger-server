@@ -108,8 +108,8 @@ where
             .await?;
         info!("Successfully saved account");
 
-        // Create a profile with display_name same as username
-        let profile = Profile::new(account.id, username.clone());
+        // For every new account, a profile is created
+        let profile = Profile::new(account.id);
 
         trace!(?profile, "Saving account profile in local database");
         self.profile_database

@@ -63,7 +63,7 @@ where
 
         // Update fields if provided
         if let Some(display_name) = update_req.display_name {
-            profile.display_name = display_name;
+            profile.display_name = Some(display_name);
         }
 
         // Store the action for later use
