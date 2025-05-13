@@ -75,7 +75,7 @@ impl SqliteDatabase {
             CREATE TABLE IF NOT EXISTS profiles (
                 id TEXT PRIMARY KEY,
                 account_id TEXT NOT NULL UNIQUE,
-                display_name TEXT NOT NULL,
+                display_name TEXT,
                 profile_picture_url TEXT,
                 updated_at INTEGER NOT NULL,
                 FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
@@ -719,10 +719,12 @@ mod tests {
             .expect("Failed to create account");
 
         // Create a test profile
+        let profile = Profile::new(account_id);
+        // Override with test values
         let profile = Profile {
-            id: Uuid::new_v4(),
+            id: profile.id,
             account_id,
-            display_name: "Test User".to_string(),
+            display_name: Some("Test User".to_string()),
             profile_picture_url: Some("https://example.com/image.jpg".to_string()),
             updated_at: 1234567890,
         };
@@ -757,13 +759,11 @@ mod tests {
         assert_eq!(fetched_by_account_id.id, profile.id);
 
         // Test profile update
-        let updated_profile = Profile {
-            id: profile.id,
-            account_id,
-            display_name: "Updated Name".to_string(),
-            profile_picture_url: None,
-            updated_at: 9876543210,
-        };
+        let mut updated_profile = Profile::new(account_id);
+        updated_profile.id = profile.id; // Use the same ID for update
+        updated_profile.display_name = Some("Updated Name".to_string());
+        updated_profile.profile_picture_url = None;
+        updated_profile.updated_at = 9876543210;
 
         db.upsert_profile(updated_profile.clone())
             .await
@@ -775,7 +775,10 @@ mod tests {
             .expect("Failed to get updated profile")
             .expect("Updated profile should exist");
 
-        assert_eq!(fetched_updated.display_name, "Updated Name");
+        assert_eq!(
+            fetched_updated.display_name,
+            Some("Updated Name".to_string())
+        );
         assert_eq!(fetched_updated.profile_picture_url, None);
         assert_eq!(fetched_updated.updated_at, 9876543210);
         assert_eq!(
