@@ -5,6 +5,7 @@ use prism_client::PrismApi;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use super::entities::Account;
 use crate::account::database::{AccountDatabase, AccountDatabaseError};
 
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +41,13 @@ impl<P: PrismApi, D: AccountDatabase> AccountService<P, D> {
         let account_res = self.prism.clone().get_account(username).await?;
 
         Ok(account_res.account.is_some())
+    }
+
+    pub async fn get_account_by_id(&self, id: Uuid) -> Result<Account, AccountServiceError> {
+        self.account_db
+            .fetch_account(id)
+            .await?
+            .ok_or(AccountServiceError::AccountNotFound)
     }
 
     /// Fetches an account ID by its username

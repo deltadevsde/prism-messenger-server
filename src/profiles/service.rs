@@ -3,38 +3,82 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use uuid::Uuid;
 
+use crate::account::database::{AccountDatabase, AccountDatabaseError};
+
 use super::database::{ProfileDatabase, ProfilePictureStorage};
 use super::entities::{
-    Profile, ProfilePictureAction, ProfilePictureUploadResponse, UpdateProfileRequest,
+    Profile, ProfilePictureAction, ProfilePictureUploadResponse, ProfileResponse,
+    UpdateProfileRequest,
 };
 use super::error::ProfileError;
 
-pub struct ProfileService<D, S>
+pub struct ProfileService<D, S, A>
 where
     D: ProfileDatabase,
     S: ProfilePictureStorage,
+    A: AccountDatabase,
 {
     profile_db: Arc<D>,
     picture_storage: Arc<S>,
+    account_db: Arc<A>,
 }
 
-impl<D, S> ProfileService<D, S>
+impl<D, S, A> ProfileService<D, S, A>
 where
     D: ProfileDatabase,
     S: ProfilePictureStorage,
+    A: AccountDatabase,
 {
-    pub fn new(profile_db: Arc<D>, picture_storage: Arc<S>) -> Self {
+    pub fn new(profile_db: Arc<D>, picture_storage: Arc<S>, account_db: Arc<A>) -> Self {
         Self {
             profile_db,
             picture_storage,
+            account_db,
         }
     }
 
-    /// Get a profile by account ID
-    pub async fn get_profile_by_account_id(
+    /// Get a profile response by account ID (combines account and profile data)
+    pub async fn get_profile_response_by_account_id(
         &self,
         account_id: Uuid,
-    ) -> Result<Profile, ProfileError> {
+    ) -> Result<ProfileResponse, ProfileError> {
+        // Get the profile
+        let profile = self.get_profile_by_account_id(account_id).await?;
+
+        // Get the account to retrieve the username
+        let account = self
+            .account_db
+            .fetch_account(account_id)
+            .await
+            .map_err(|e| match e {
+                AccountDatabaseError::NotFound(_) => ProfileError::NotFound,
+                _ => ProfileError::Internal(e.to_string()),
+            })?
+            .ok_or(ProfileError::NotFound)?;
+
+        // Create and return the profile response
+        Ok(ProfileResponse::new(account.username, profile))
+    }
+
+    pub async fn get_profile_response_by_username(
+        &self,
+        username: &str,
+    ) -> Result<ProfileResponse, ProfileError> {
+        let account = self
+            .account_db
+            .fetch_account_by_username(username)
+            .await?
+            .ok_or(ProfileError::NotFound)?;
+
+        // Get the profile
+        let profile = self.get_profile_by_account_id(account.id).await?;
+
+        // Create and return the profile response
+        Ok(ProfileResponse::new(account.username, profile))
+    }
+
+    /// Get a profile by account ID
+    async fn get_profile_by_account_id(&self, account_id: Uuid) -> Result<Profile, ProfileError> {
         match self
             .profile_db
             .get_profile_by_account_id(account_id)
