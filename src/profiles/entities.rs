@@ -82,3 +82,29 @@ pub struct ProfilePictureUploadResponse {
     /// Expiration time for the upload URL in seconds
     pub expires_in: u64,
 }
+
+/// Response for profile data
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileResponse {
+    /// Account ID this profile belongs to
+    pub account_id: Uuid,
+    /// Username of the user
+    pub username: String,
+    /// Display name of the user
+    pub display_name: Option<String>,
+    /// Path to the user's profile picture, if any
+    pub picture: Option<String>,
+}
+
+impl ProfileResponse {
+    /// Creates a new ProfileResponse from the given data
+    pub fn new(username: String, profile: Profile) -> Self {
+        Self {
+            account_id: profile.account_id,
+            username,
+            display_name: profile.display_name,
+            picture: profile.profile_picture_url,
+        }
+    }
+}
