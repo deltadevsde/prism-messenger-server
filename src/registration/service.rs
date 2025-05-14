@@ -1,34 +1,44 @@
 use always_send::FutureExt;
 use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKey};
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, trace};
 
 use super::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
     PRISM_MESSENGER_SERVICE_ID,
     account::{database::AccountDatabase, entities::Account},
+    profiles::{database::ProfileDatabase, entities::Profile},
 };
 
-pub struct RegistrationService<P, D>
+pub struct RegistrationService<P, AD, PD>
 where
     P: PrismApi,
-    D: AccountDatabase,
+    AD: AccountDatabase,
+    PD: ProfileDatabase,
 {
     prism: Arc<P>,
     signing_key: SigningKey,
-    account_database: Arc<D>,
+    account_database: Arc<AD>,
+    profile_database: Arc<PD>,
 }
 
-impl<P, D> RegistrationService<P, D>
+impl<P, AD, PD> RegistrationService<P, AD, PD>
 where
     P: PrismApi,
-    D: AccountDatabase,
+    AD: AccountDatabase,
+    PD: ProfileDatabase,
 {
-    pub fn new(prism: Arc<P>, account_database: Arc<D>, signing_key: SigningKey) -> Self {
+    pub fn new(
+        prism: Arc<P>,
+        signing_key: SigningKey,
+        account_database: Arc<AD>,
+        profile_database: Arc<PD>,
+    ) -> Self {
         Self {
             prism,
-            account_database,
             signing_key,
+            account_database,
+            profile_database,
         }
     }
 
@@ -73,7 +83,7 @@ where
         let signature_bundle =
             SignatureBundle::new(user_identity_verifying_key.clone(), registration_signature);
 
-        debug!("Sending request to prism API");
+        trace!("Sending request to prism API");
         self.prism
             .clone()
             .build_request()
@@ -87,14 +97,24 @@ where
             // working around rust #100031 with always_send()
             .always_send()
             .await?;
-
         info!(username, "Successfully created account on prism");
-        let account = Account::new(username, auth_password, apns_token, gcm_token);
 
-        debug!(?account, "Saving created account in local database");
+        let account = Account::new(auth_password, apns_token, gcm_token);
+
+        trace!(?account, "Saving created account in local database");
         self.account_database
             .clone()
             .upsert_account(account.clone())
+            .await?;
+        info!("Successfully saved account");
+
+        // For every new account, a profile is created
+        let profile = Profile::new(account.id, username);
+
+        trace!(?profile, "Saving account profile in local database");
+        self.profile_database
+            .clone()
+            .upsert_profile(profile)
             .await?;
 
         info!("Registration completed successfully");
@@ -113,6 +133,7 @@ mod tests {
 
     use crate::{
         account::database::MockAccountDatabase,
+        profiles::database::MockProfileDatabase,
         registration::{error::RegistrationError, service::RegistrationService},
     };
 
@@ -120,6 +141,7 @@ mod tests {
     async fn test_create_account() -> Result<()> {
         let mut mock_prism = MockPrismApi::new();
         let mut mock_account_db = MockAccountDatabase::new();
+        let mut mock_profile_db = MockProfileDatabase::new();
         let service_signing_key = SigningKey::new_ed25519();
 
         let username = "test_user".to_string();
@@ -128,6 +150,11 @@ mod tests {
 
         mock_account_db
             .expect_upsert_account()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        mock_profile_db
+            .expect_upsert_profile()
             .times(1)
             .returning(|_| Ok(()));
 
@@ -143,8 +170,9 @@ mod tests {
         // Wrap the configured mocks in Arc and create the service
         let service = RegistrationService::new(
             Arc::new(mock_prism),
-            Arc::new(mock_account_db),
             service_signing_key.clone(),
+            Arc::new(mock_account_db),
+            Arc::new(mock_profile_db),
         );
 
         // Simulate a client requesting registration
@@ -177,6 +205,7 @@ mod tests {
         // Setup test components
         let mut mock_prism = MockPrismApi::new();
         let mut mock_account_db = MockAccountDatabase::new();
+        let mut mock_profile_db = MockProfileDatabase::new();
         let service_signing_key = SigningKey::new_ed25519();
 
         let username = "push_token_test_user".to_string();
@@ -193,11 +222,16 @@ mod tests {
             .expect_upsert_account()
             .returning(|_| Ok(()));
 
+        mock_profile_db
+            .expect_upsert_profile()
+            .returning(|_| Ok(()));
+
         // Create the service
         let service = RegistrationService::new(
             Arc::new(mock_prism),
-            Arc::new(mock_account_db),
             service_signing_key.clone(),
+            Arc::new(mock_account_db),
+            Arc::new(mock_profile_db),
         );
 
         // Request registration to get challenge
