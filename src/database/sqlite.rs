@@ -452,7 +452,7 @@ impl ProfileDatabase for SqliteDatabase {
             "#,
         )
         .bind(profile.id.to_string())
-        .bind(&profile.account_id.to_string())
+        .bind(profile.account_id.to_string())
         .bind(&profile.username)
         .bind(&profile.display_name)
         .bind(&profile.profile_picture_url)
@@ -815,7 +815,7 @@ mod tests {
             .expect("Failed to remove account");
 
         let profile_after_account_deletion = db
-            .get_profile_by_id(account_id)
+            .get_profile_by_id(profile.id)
             .await
             .expect("get_profile_by_id should not fail after account deletion");
 
