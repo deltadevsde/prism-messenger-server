@@ -13,6 +13,9 @@ pub trait ProfileDatabase: Send + Sync {
     
     /// Get a user profile by account ID
     async fn get_profile_by_account_id(&self, account_id: Uuid) -> Result<Option<Profile>, ProfileError>;
+    
+    /// Get a user profile by username
+    async fn get_profile_by_username(&self, username: &str) -> Result<Option<Profile>, ProfileError>;
 
     /// Create or update a profile
     async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError>;

@@ -30,7 +30,6 @@ impl SqliteDatabase {
             r#"
             CREATE TABLE IF NOT EXISTS accounts (
                 id TEXT PRIMARY KEY,
-                username TEXT NOT NULL UNIQUE,
                 auth_password_hash TEXT NOT NULL,
                 apns_token BLOB,
                 gcm_token BLOB
@@ -75,6 +74,7 @@ impl SqliteDatabase {
             CREATE TABLE IF NOT EXISTS profiles (
                 id TEXT PRIMARY KEY,
                 account_id TEXT NOT NULL UNIQUE,
+                username TEXT NOT NULL UNIQUE,
                 display_name TEXT,
                 profile_picture_url TEXT,
                 updated_at INTEGER NOT NULL,
@@ -108,17 +108,15 @@ impl AccountDatabase for SqliteDatabase {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO accounts (id, username, auth_password_hash, apns_token, gcm_token)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, auth_password_hash, apns_token, gcm_token)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
-                username = excluded.username,
                 auth_password_hash = excluded.auth_password_hash,
                 apns_token = excluded.apns_token,
                 gcm_token = excluded.gcm_token
             "#,
         )
         .bind(account.id.to_string())
-        .bind(&account.username)
         .bind(account.auth_password_hash.to_string())
         .bind(account.apns_token.as_deref())
         .bind(account.gcm_token.as_deref())
@@ -131,44 +129,12 @@ impl AccountDatabase for SqliteDatabase {
     async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError> {
         let row = sqlx::query(
             r#"
-            SELECT id, username, auth_password_hash, apns_token, gcm_token
+            SELECT id, auth_password_hash, apns_token, gcm_token
             FROM accounts
             WHERE id = ?
             "#,
         )
         .bind(id.to_string())
-        .fetch_optional(&self.pool)
-        .await?;
-
-        row.map(|row| {
-            let salted_hash = row.try_get("auth_password_hash").map(SaltedHash::new)?;
-
-            let id_str: String = row.try_get("id")?;
-            let id = Uuid::parse_str(&id_str)?;
-
-            Ok(Account {
-                id,
-                username: row.try_get("username")?,
-                auth_password_hash: salted_hash,
-                apns_token: row.try_get("apns_token")?,
-                gcm_token: row.try_get("gcm_token")?,
-            })
-        })
-        .transpose()
-    }
-
-    async fn fetch_account_by_username(
-        &self,
-        username: &str,
-    ) -> Result<Option<Account>, AccountDatabaseError> {
-        let row = sqlx::query(
-            r#"
-            SELECT id, username, auth_password_hash, apns_token, gcm_token
-            FROM accounts
-            WHERE username = ?
-            "#,
-        )
-        .bind(username)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -182,7 +148,6 @@ impl AccountDatabase for SqliteDatabase {
 
             Ok(Account {
                 id,
-                username: row.try_get("username")?,
                 auth_password_hash: salted_hash,
                 apns_token: row.try_get("apns_token")?,
                 gcm_token: row.try_get("gcm_token")?,
@@ -234,7 +199,11 @@ impl AccountDatabase for SqliteDatabase {
 
 #[async_trait]
 impl KeyDatabase for SqliteDatabase {
-    async fn insert_keybundle(&self, account_id: Uuid, key_bundle: KeyBundle) -> Result<(), KeyError> {
+    async fn insert_keybundle(
+        &self,
+        account_id: Uuid,
+        key_bundle: KeyBundle,
+    ) -> Result<(), KeyError> {
         let mut tx = self.pool.begin().await?;
 
         // First, delete any existing key bundle and prekeys for this user
@@ -399,7 +368,7 @@ impl ProfileDatabase for SqliteDatabase {
     async fn get_profile_by_id(&self, id: Uuid) -> Result<Option<Profile>, ProfileError> {
         let row = sqlx::query(
             r#"
-            SELECT id, account_id, display_name, profile_picture_url, updated_at
+            SELECT id, account_id, username, display_name, profile_picture_url, updated_at
             FROM profiles
             WHERE id = ?
             "#,
@@ -421,6 +390,7 @@ impl ProfileDatabase for SqliteDatabase {
                 Ok(Some(Profile {
                     id,
                     account_id,
+                    username: row.try_get("username")?,
                     display_name: row.try_get("display_name")?,
                     profile_picture_url: row.try_get("profile_picture_url")?,
                     updated_at: row.try_get::<i64, _>("updated_at")? as u64,
@@ -436,7 +406,7 @@ impl ProfileDatabase for SqliteDatabase {
     ) -> Result<Option<Profile>, ProfileError> {
         let row = sqlx::query(
             r#"
-            SELECT id, account_id, display_name, profile_picture_url, updated_at
+            SELECT id, account_id, username, display_name, profile_picture_url, updated_at
             FROM profiles
             WHERE account_id = ?
             "#,
@@ -458,6 +428,7 @@ impl ProfileDatabase for SqliteDatabase {
                 Ok(Some(Profile {
                     id,
                     account_id,
+                    username: row.try_get("username")?,
                     display_name: row.try_get("display_name")?,
                     profile_picture_url: row.try_get("profile_picture_url")?,
                     updated_at: row.try_get::<i64, _>("updated_at")? as u64,
@@ -470,17 +441,19 @@ impl ProfileDatabase for SqliteDatabase {
     async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError> {
         sqlx::query(
             r#"
-            INSERT INTO profiles (id, account_id, display_name, profile_picture_url, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO profiles (id, account_id, username, display_name, profile_picture_url, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 account_id = excluded.account_id,
+                username = excluded.username,
                 display_name = excluded.display_name,
                 profile_picture_url = excluded.profile_picture_url,
                 updated_at = excluded.updated_at
             "#,
         )
         .bind(profile.id.to_string())
-        .bind(profile.account_id.to_string())
+        .bind(&profile.account_id.to_string())
+        .bind(&profile.username)
         .bind(&profile.display_name)
         .bind(&profile.profile_picture_url)
         .bind(profile.updated_at as i64)
@@ -488,6 +461,44 @@ impl ProfileDatabase for SqliteDatabase {
         .await?;
 
         Ok(())
+    }
+
+    async fn get_profile_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<Profile>, ProfileError> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, account_id, username, display_name, profile_picture_url, updated_at
+            FROM profiles
+            WHERE username = ?
+            "#,
+        )
+        .bind(username)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => {
+                let id_str: String = row.try_get("id")?;
+                let id =
+                    Uuid::parse_str(&id_str).map_err(|e| ProfileError::Internal(e.to_string()))?;
+
+                let account_id_str: String = row.try_get("account_id")?;
+                let account_id = Uuid::parse_str(&account_id_str)
+                    .map_err(|e| ProfileError::Internal(e.to_string()))?;
+
+                Ok(Some(Profile {
+                    id,
+                    account_id,
+                    username: row.try_get("username")?,
+                    display_name: row.try_get("display_name")?,
+                    profile_picture_url: row.try_get("profile_picture_url")?,
+                    updated_at: row.try_get::<i64, _>("updated_at")? as u64,
+                }))
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -511,7 +522,7 @@ mod tests {
         db.init().await.expect("Failed to initialize database");
 
         // Create a test account
-        let account = Account::new("testuser".to_string(), "password123", None, None);
+        let account = Account::new("password123", Some(b"test_apns_token".to_vec()), None);
         let account_id = account.id;
 
         // Test upsert_account
@@ -525,15 +536,7 @@ mod tests {
             .await
             .expect("Failed to fetch account")
             .expect("Account should exist");
-        assert_eq!(fetched.username, "testuser");
-
-        // Test fetch_account_by_username
-        let fetched_by_username = db
-            .fetch_account_by_username("testuser")
-            .await
-            .expect("Failed to fetch account by username")
-            .expect("Account should exist");
-        assert_eq!(fetched_by_username.id, account_id);
+        assert_eq!(fetched.apns_token, Some(b"test_apns_token".to_vec()));
 
         // Test remove_account
         db.remove_account(account_id)
@@ -558,13 +561,12 @@ mod tests {
         db.init().await.expect("Failed to initialize database");
 
         // Create a test account
-        let account = Account::new("apnsuser".to_string(), "password123", None, None);
+        let account = Account::new("password123", None, None);
         let account_id = account.id;
 
-        // Insert the account
         db.upsert_account(account)
             .await
-            .expect("Failed to upsert account");
+            .expect("Failed to insert account");
 
         // Update the APNS token
         let new_token = vec![1, 2, 3, 4, 5];
@@ -711,7 +713,7 @@ mod tests {
 
         // First create a test account (needed due to foreign key constraint)
         let username = "profileuser";
-        let account = Account::new(username.to_string(), "password123", None, None);
+        let account = Account::new("password123", None, None);
         let account_id = account.id;
 
         db.upsert_account(account)
@@ -719,11 +721,12 @@ mod tests {
             .expect("Failed to create account");
 
         // Create a test profile
-        let profile = Profile::new(account_id);
+        let profile = Profile::new(account_id, username.to_string());
         // Override with test values
         let profile = Profile {
             id: profile.id,
             account_id,
+            username: username.to_string(),
             display_name: Some("Test User".to_string()),
             profile_picture_url: Some("https://example.com/image.jpg".to_string()),
             updated_at: 1234567890,
@@ -759,7 +762,7 @@ mod tests {
         assert_eq!(fetched_by_account_id.id, profile.id);
 
         // Test profile update
-        let mut updated_profile = Profile::new(account_id);
+        let mut updated_profile = Profile::new(account_id, username.to_string());
         updated_profile.id = profile.id; // Use the same ID for update
         updated_profile.display_name = Some("Updated Name".to_string());
         updated_profile.profile_picture_url = None;

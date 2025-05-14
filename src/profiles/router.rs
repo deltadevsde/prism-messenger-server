@@ -46,7 +46,7 @@ async fn get_profile(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .profile_service
-        .get_profile_response_by_account_id(account_id)
+        .get_profile_by_account_id(account_id)
         .await
         .map(Json)
 }
@@ -67,7 +67,7 @@ async fn get_profile_by_username(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .profile_service
-        .get_profile_response_by_username(&username)
+        .get_profile_by_username(&username)
         .await
         .map(Json)
 }

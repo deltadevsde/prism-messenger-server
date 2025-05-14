@@ -43,25 +43,6 @@ impl<P: PrismApi, D: AccountDatabase> AccountService<P, D> {
         Ok(account_res.account.is_some())
     }
 
-    pub async fn get_account_by_id(&self, id: Uuid) -> Result<Account, AccountServiceError> {
-        self.account_db
-            .fetch_account(id)
-            .await?
-            .ok_or(AccountServiceError::AccountNotFound)
-    }
-
-    /// Fetches an account ID by its username
-    pub async fn get_account_id_by_username(
-        &self,
-        username: &str,
-    ) -> Result<Uuid, AccountServiceError> {
-        self.account_db
-            .fetch_account_by_username(username)
-            .await?
-            .map(|acc| acc.id)
-            .ok_or(AccountServiceError::AccountNotFound)
-    }
-
     /// Updates an account's APNS token
     pub async fn update_apns_token(
         &self,
