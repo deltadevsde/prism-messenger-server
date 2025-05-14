@@ -99,7 +99,7 @@ where
             .await?;
         info!(username, "Successfully created account on prism");
 
-        let account = Account::new(username.clone(), auth_password, apns_token, gcm_token);
+        let account = Account::new(auth_password, apns_token, gcm_token);
 
         trace!(?account, "Saving created account in local database");
         self.account_database
@@ -109,7 +109,7 @@ where
         info!("Successfully saved account");
 
         // For every new account, a profile is created
-        let profile = Profile::new(account.id);
+        let profile = Profile::new(account.id, username);
 
         trace!(?profile, "Saving account profile in local database");
         self.profile_database

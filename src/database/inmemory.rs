@@ -63,21 +63,7 @@ impl AccountDatabase for InMemoryDatabase {
         Ok(account)
     }
 
-    async fn fetch_account_by_username(
-        &self,
-        username: &str,
-    ) -> Result<Option<Account>, AccountDatabaseError> {
-        let account_lock = self
-            .accounts
-            .lock()
-            .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
-        let account = account_lock
-            .values()
-            .find(|account| account.username == username)
-            .cloned();
-        Ok(account)
-    }
 
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
         let mut account_lock = self
@@ -209,6 +195,23 @@ impl ProfileDatabase for InMemoryDatabase {
         let matching_profile = profiles
             .values()
             .find(|profile| profile.account_id == account_id)
+            .cloned();
+        Ok(matching_profile)
+    }
+
+    async fn get_profile_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<Profile>, ProfileError> {
+        let profiles = self
+            .profiles
+            .read()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        // Find the profile with matching username
+        let matching_profile = profiles
+            .values()
+            .find(|profile| profile.username == username)
             .cloned();
         Ok(matching_profile)
     }

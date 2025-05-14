@@ -22,7 +22,7 @@ pub struct AppContext {
     pub key_service: KeyService<PrismHttpClient, SqliteDatabase>,
     pub messaging_service:
         MessagingService<SqliteDatabase, InMemoryDatabase, ApnsNotificationGateway>,
-    pub profile_service: ProfileService<SqliteDatabase, S3Storage, SqliteDatabase>,
+    pub profile_service: ProfileService<SqliteDatabase, S3Storage>,
     pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase, SqliteDatabase>,
     pub initialization_service: InitializationService<PrismHttpClient>,
 }
@@ -96,7 +96,7 @@ impl AppContext {
         let key_service = KeyService::new(prism_arc.clone(), core_db.clone());
         let messaging_service =
             MessagingService::new(core_db.clone(), ephemeral_db.clone(), apns_gateway_arc);
-        let profile_service = ProfileService::new(core_db.clone(), assets_db.clone(), core_db.clone());
+        let profile_service = ProfileService::new(core_db.clone(), assets_db.clone());
         let initialization_service = InitializationService::new(prism_arc.clone(), signing_key);
 
         Ok(Self {

@@ -10,6 +10,8 @@ pub struct Profile {
     pub id: Uuid,
     /// UUID of the associated account
     pub account_id: Uuid,
+    /// Username of the user
+    pub username: String,
     /// Display name of the user
     pub display_name: Option<String>,
     /// URL to the profile picture, if one exists
@@ -19,14 +21,14 @@ pub struct Profile {
 }
 
 impl Profile {
-    /// Creates a new profile with an account ID
+    /// Creates a new profile with an account ID and username
     ///
     /// Other fields are initialized with default values:
     /// - id: randomly generated UUID
     /// - display_name: None
     /// - profile_picture_url: None
     /// - updated_at: current timestamp in milliseconds
-    pub fn new(account_id: Uuid) -> Self {
+    pub fn new(account_id: Uuid, username: String) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -35,6 +37,7 @@ impl Profile {
         Self {
             id: Uuid::new_v4(),
             account_id,
+            username,
             display_name: None,
             profile_picture_url: None,
             updated_at: now,
@@ -99,10 +102,10 @@ pub struct ProfileResponse {
 
 impl ProfileResponse {
     /// Creates a new ProfileResponse from the given data
-    pub fn new(username: String, profile: Profile) -> Self {
+    pub fn new(profile: Profile) -> Self {
         Self {
             account_id: profile.account_id,
-            username,
+            username: profile.username,
             display_name: profile.display_name,
             picture: profile.profile_picture_url,
         }
