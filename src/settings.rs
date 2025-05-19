@@ -2,6 +2,7 @@ use std::path::Path;
 
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
+use prism_telemetry::config::TelemetryConfig;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WebserverSettings {
@@ -41,6 +42,7 @@ pub struct Settings {
     pub prism: PrismSettings,
     pub apns: ApnsSettings,
     pub database: DatabaseSettings,
+    pub telemetry: Option<TelemetryConfig>,
 }
 
 impl Settings {

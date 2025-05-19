@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use uuid::Uuid;
+use tracing::error;
 
 use super::{
     database::MessageDatabase,
@@ -66,7 +67,7 @@ where
             {
                 Ok(_) => {}
                 Err(e) => {
-                    tracing::error!("Failed to send notification: {}", e);
+                    error!("Failed to send notification: {}", e);
                     return Err(e.into());
                 }
             }
