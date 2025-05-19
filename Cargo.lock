@@ -3206,6 +3206,7 @@ dependencies = [
  "log",
  "mockall",
  "opentelemetry",
+ "opentelemetry_sdk",
  "parking_lot",
  "prism-client",
  "prism-telemetry",

@@ -19,6 +19,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use tokio::spawn;
 use tracing::{debug, info, error};
+use prism_telemetry::telemetry::shutdown_telemetry;
 use crate::telemetry::metrics_registry::get_metrics;
 use crate::telemetry::init::init;
 
@@ -55,8 +56,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let attributes: Vec<(String, String)> = vec![
         ("labvel".to_string(), "value".to_string()),
     ];
-    init(
-        telemetry_config,
+    let (meter_provider, log_provider) = init(
+        telemetry_config.clone(),
         attributes,
     )?;
 
@@ -88,6 +89,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             info!("Webserver task completed")
         }
     }
+
+    shutdown_telemetry(telemetry_config, meter_provider, log_provider);
 
     Ok(())
 }
