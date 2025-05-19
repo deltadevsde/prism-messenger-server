@@ -1,15 +1,15 @@
-use crate::telemetry::metrics_registry::{init_metrics_registry, get_metrics};
+use crate::telemetry::metrics_registry::init_metrics_registry;
 
 use opentelemetry::global::{self};
 use prism_telemetry::telemetry::{init_telemetry, build_resource, set_global_attributes};
 use prism_telemetry::logs::setup_log_subscriber;
 use prism_telemetry::config::TelemetryConfig;
 
-pub fn init(telemetry_config: &TelemetryConfig, attributes: Vec<(String, String)>) -> Result<(), anyhow::Error> {
+pub fn init(telemetry_config: TelemetryConfig, attributes: Vec<(String, String)>) -> Result<(), anyhow::Error> {
     // Initialize the telemetry system
 
     let mut attributes = attributes.clone();
-    attributes.extend(telemetry_config.global_labels.labels.clone().into_iter().map(|(k, v)| (k, v)));
+    attributes.extend(telemetry_config.global_labels.labels.clone());
 
     set_global_attributes(attributes.clone());
 

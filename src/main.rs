@@ -52,10 +52,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Initialize telemetry
-    let mut attributes: Vec<(String, String)> = Vec::new();
-    attributes.push(("label".to_string(), "value".to_string()));
+    let attributes: Vec<(String, String)> = vec![
+        ("labvel".to_string(), "value".to_string()),
+    ];
     init(
-        &telemetry_config,
+        telemetry_config,
         attributes,
     )?;
 
