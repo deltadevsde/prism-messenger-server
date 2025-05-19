@@ -17,7 +17,8 @@ pub fn init(telemetry_config: TelemetryConfig, attributes: Vec<(String, String)>
 
     let resource = build_resource("prism-messenger-server".to_string(), attributes);
 
-    let (meter_provider, log_provider) = init_telemetry(&telemetry_config, resource).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let (meter_provider, log_provider) = init_telemetry(&telemetry_config, resource)
+        .map_err(|e| anyhow::anyhow!("Failed to initialize telemetry: {}", e))?;
 
     // Initialize tracing subscriber, fallback to stdout/stderr if no log provider
     setup_log_subscriber(
@@ -33,5 +34,6 @@ pub fn init(telemetry_config: TelemetryConfig, attributes: Vec<(String, String)>
     } else {
         tracing::warn!("No meter provider available, metrics will not be recorded");
     }
+
     Ok((meter_provider, log_provider))
 }
