@@ -26,7 +26,7 @@ impl PrismMetrics {
         info!("Initializing Prism metrics registry");
         let meter = global::meter("prism");
 
-        let prefix = "prism_";
+        let prefix = "prism_messenger_server_";
 
         let node_info = meter
             .u64_gauge(format!("{}node_info", prefix))

@@ -18,3 +18,42 @@ bundle_id = "com.whatever.PrismMessenger"
 [database]
 type = "sqlite"
 path = "~/.prism/prism_messenger.sqlite"
+
+[telemetry.metrics]
+enabled = true
+endpoint = "https://alloy.prism.boo"
+
+[telemetry.metrics.auth]
+enabled = true
+username = "username"
+password = "password"
+
+[telemetry.logs]
+enabled = true
+endpoint = "https://alloy.prism.boo"
+
+[telemetry.logs.auth]
+enabled = true
+username = "username"
+password = "password"
+
+[telemetry.traces]
+enabled = false
+endpoint = "https://alloy.prism.boo"
+
+[telemetry.traces.auth]
+enabled = false
+username = ""
+password = ""
+
+[telemetry.profiles]
+enabled = false
+endpoint = "https://alloy.prism.boo"
+
+[telemetry.profiles.auth]
+enabled = false
+username = ""
+password = ""
+
+[telemetry.global_labels.labels]
+node_name = "prism-messenger-server-0"
