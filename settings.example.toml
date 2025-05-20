@@ -20,26 +20,26 @@ type = "sqlite"
 path = "~/.prism/prism_messenger.sqlite"
 
 [telemetry.metrics]
-enabled = true
-endpoint = "https://alloy.prism.boo"
+enabled = false
+endpoint = ""
 
 [telemetry.metrics.auth]
-enabled = true
-username = "username"
-password = "password"
+enabled = false
+username = ""
+password = ""
 
 [telemetry.logs]
-enabled = true
-endpoint = "https://alloy.prism.boo"
+enabled = false
+endpoint = ""
 
 [telemetry.logs.auth]
-enabled = true
-username = "username"
-password = "password"
+enabled = false
+username = ""
+password = ""
 
 [telemetry.traces]
 enabled = false
-endpoint = "https://alloy.prism.boo"
+endpoint = ""
 
 [telemetry.traces.auth]
 enabled = false
@@ -48,7 +48,7 @@ password = ""
 
 [telemetry.profiles]
 enabled = false
-endpoint = "https://alloy.prism.boo"
+endpoint = ""
 
 [telemetry.profiles.auth]
 enabled = false
