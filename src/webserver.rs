@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::info;
+use tracing::info;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
