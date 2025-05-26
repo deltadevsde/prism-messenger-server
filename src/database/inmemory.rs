@@ -54,9 +54,9 @@ impl AccountDatabase for InMemoryDatabase {
         Ok(account)
     }
 
-    async fn fetch_account_by_username(
+    async fn fetch_account_by_prism_identifier(
         &self,
-        username: &str,
+        prism_identifier: &str,
     ) -> Result<Option<Account>, AccountDatabaseError> {
         let account_lock = self
             .accounts
@@ -65,7 +65,7 @@ impl AccountDatabase for InMemoryDatabase {
 
         let account = account_lock
             .values()
-            .find(|account| account.username == username)
+            .find(|account| account.prism_identifier == prism_identifier)
             .cloned();
         Ok(account)
     }

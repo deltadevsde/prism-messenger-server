@@ -27,6 +27,7 @@ pub async fn start(settings: &WebserverSettings, context: AppContext) -> Result<
         .nest("/keys", keys::router(context_arc.clone()))
         .nest("/messages", messages::router(context_arc.clone()))
         .nest("/registration", registration::router())
+        .nest("/registration", registration::phone_router())
         .with_state(context_arc)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

@@ -27,7 +27,8 @@ impl SqliteDatabase {
             r#"
             CREATE TABLE IF NOT EXISTS accounts (
                 id TEXT PRIMARY KEY,
-                username TEXT NOT NULL UNIQUE,
+                prism_identifier TEXT NOT NULL UNIQUE,
+                service TEXT NOT NULL,
                 auth_password_hash TEXT NOT NULL,
                 apns_token BLOB,
                 gcm_token BLOB
@@ -89,17 +90,19 @@ impl AccountDatabase for SqliteDatabase {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO accounts (id, username, auth_password_hash, apns_token, gcm_token)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, prism_identifier, service, auth_password_hash, apns_token, gcm_token)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
-                username = excluded.username,
+                prism_identifier = excluded.prism_identifier,
+                service = excluded.service,
                 auth_password_hash = excluded.auth_password_hash,
                 apns_token = excluded.apns_token,
                 gcm_token = excluded.gcm_token
             "#,
         )
         .bind(account.id.to_string())
-        .bind(&account.username)
+        .bind(&account.prism_identifier)
+        .bind(&account.service)
         .bind(account.auth_password_hash.to_string())
         .bind(account.apns_token.as_deref())
         .bind(account.gcm_token.as_deref())
@@ -112,7 +115,7 @@ impl AccountDatabase for SqliteDatabase {
     async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError> {
         let row = sqlx::query(
             r#"
-            SELECT id, username, auth_password_hash, apns_token, gcm_token
+            SELECT id, prism_identifier, service, auth_password_hash, apns_token, gcm_token
             FROM accounts
             WHERE id = ?
             "#,
@@ -129,7 +132,8 @@ impl AccountDatabase for SqliteDatabase {
 
             Ok(Account {
                 id,
-                username: row.try_get("username")?,
+                prism_identifier: row.try_get("prism_identifier")?,
+                service: row.try_get("service")?,
                 auth_password_hash: salted_hash,
                 apns_token: row.try_get("apns_token")?,
                 gcm_token: row.try_get("gcm_token")?,
@@ -138,18 +142,18 @@ impl AccountDatabase for SqliteDatabase {
         .transpose()
     }
 
-    async fn fetch_account_by_username(
+    async fn fetch_account_by_prism_identifier(
         &self,
-        username: &str,
+        prism_identifier: &str,
     ) -> Result<Option<Account>, AccountDatabaseError> {
         let row = sqlx::query(
             r#"
-            SELECT id, username, auth_password_hash, apns_token, gcm_token
+            SELECT id, prism_identifier, service, auth_password_hash, apns_token, gcm_token
             FROM accounts
-            WHERE username = ?
+            WHERE prism_identifier = ?
             "#,
         )
-        .bind(username)
+        .bind(prism_identifier)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -163,7 +167,8 @@ impl AccountDatabase for SqliteDatabase {
 
             Ok(Account {
                 id,
-                username: row.try_get("username")?,
+                prism_identifier: row.try_get("prism_identifier")?,
+                service: row.try_get("service")?,
                 auth_password_hash: salted_hash,
                 apns_token: row.try_get("apns_token")?,
                 gcm_token: row.try_get("gcm_token")?,
@@ -395,7 +400,7 @@ mod tests {
         db.init().await.expect("Failed to initialize database");
 
         // Create a test account
-        let account = Account::new("testuser".to_string(), "password123", None, None);
+        let account = Account::new("testuser".to_string(), "prism_messenger".to_string(), "password123", None, None);
         let account_id = account.id;
 
         // Test upsert_account
@@ -409,15 +414,15 @@ mod tests {
             .await
             .expect("Failed to fetch account")
             .expect("Account should exist");
-        assert_eq!(fetched.username, "testuser");
+        assert_eq!(fetched.prism_identifier, "testuser");
 
-        // Test fetch_account_by_username
-        let fetched_by_username = db
-            .fetch_account_by_username("testuser")
+        // Test fetch_account_by_prism_identifier
+        let fetched_by_prism_identifier = db
+            .fetch_account_by_prism_identifier("testuser")
             .await
-            .expect("Failed to fetch account by username")
+            .expect("Failed to fetch account by prism_identifier")
             .expect("Account should exist");
-        assert_eq!(fetched_by_username.id, account_id);
+        assert_eq!(fetched_by_prism_identifier.id, account_id);
 
         // Test remove_account
         db.remove_account(account_id)
@@ -442,7 +447,7 @@ mod tests {
         db.init().await.expect("Failed to initialize database");
 
         // Create a test account
-        let account = Account::new("apnsuser".to_string(), "password123", None, None);
+        let account = Account::new("apnsuser".to_string(), "prism_messenger".to_string(), "password123", None, None);
         let account_id = account.id;
 
         // Insert the account

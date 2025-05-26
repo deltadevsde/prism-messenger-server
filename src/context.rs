@@ -9,7 +9,7 @@ use crate::{
     keys::service::KeyService,
     messages::service::MessagingService,
     notifications::gateway::apns::ApnsNotificationGateway,
-    registration::service::RegistrationService,
+    registration::{service::RegistrationService, phone_service::PhoneRegistrationService},
     settings::{DatabaseSettings, Settings},
 };
 
@@ -20,6 +20,7 @@ pub struct AppContext {
     pub messaging_service:
         MessagingService<SqliteDatabase, InMemoryDatabase, ApnsNotificationGateway>,
     pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase>,
+    pub phone_registration_service: PhoneRegistrationService<PrismHttpClient, SqliteDatabase>,
     pub initialization_service: InitializationService<PrismHttpClient>,
 }
 
@@ -58,6 +59,14 @@ impl AppContext {
         let auth_service = AuthService::new(sqlite_db.clone());
         let registration_service =
             RegistrationService::new(prism_arc.clone(), sqlite_db.clone(), signing_key.clone());
+        let phone_registration_service = PhoneRegistrationService::new(
+            prism_arc.clone(),
+            sqlite_db.clone(),
+            signing_key.clone(),
+            settings.twilio.account_sid.clone(),
+            settings.twilio.auth_token.clone(),
+            settings.twilio.verify_service_sid.clone(),
+        );
         let key_service = KeyService::new(prism_arc.clone(), sqlite_db.clone());
         let messaging_service =
             MessagingService::new(sqlite_db.clone(), in_memory_db.clone(), apns_gateway_arc);
@@ -67,6 +76,7 @@ impl AppContext {
             account_service,
             auth_service,
             registration_service,
+            phone_registration_service,
             key_service,
             messaging_service,
             initialization_service,

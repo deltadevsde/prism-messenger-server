@@ -18,3 +18,8 @@ bundle_id = "com.whatever.PrismMessenger"
 [database]
 type = "sqlite"
 path = "~/.prism/prism_messenger.sqlite"
+
+[twilio]
+account_sid = "account_sid"
+auth_token = "auth_token"
+verify_service_sid = "verify_service_sid"

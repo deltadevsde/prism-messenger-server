@@ -26,6 +26,13 @@ pub struct ApnsSettings {
     pub private_key_path: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct TwilioSettings {
+    pub account_sid: String,
+    pub auth_token: String,
+    pub verify_service_sid: String,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "lowercase")]
@@ -40,6 +47,7 @@ pub struct Settings {
     pub webserver: WebserverSettings,
     pub prism: PrismSettings,
     pub apns: ApnsSettings,
+    pub twilio: TwilioSettings,
     pub database: DatabaseSettings,
 }
 
