@@ -30,6 +30,11 @@ access_key = "YOUR_ACCESS_KEY"
 secret_key = "YOUR_SECRET_KEY"
 endpoint = "https://custom-endpoint.example.com"  # Optional
 
+[twilio]
+account_sid = "account_sid"
+auth_token = "auth_token"
+verify_service_sid = "verify_service_sid"
+
 [telemetry.metrics]
 enabled = false
 endpoint = ""
