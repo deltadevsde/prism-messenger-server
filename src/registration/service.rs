@@ -89,7 +89,7 @@ where
             .await?;
 
         info!(username, "Successfully created account on prism");
-        let account = Account::new(username, auth_password, apns_token, gcm_token);
+        let account = Account::new(username, crate::PRISM_MESSENGER_SERVICE_ID.to_string(), auth_password, apns_token, gcm_token);
 
         debug!(?account, "Saving created account in local database");
         self.account_database

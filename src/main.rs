@@ -21,6 +21,7 @@ use tracing::debug;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub static PRISM_MESSENGER_SERVICE_ID: &str = "prism_messenger";
+pub static PRISM_PHONE_SERVICE_ID: &str = "prism_phone";
 
 /// Command line arguments for the Prism Messenger Server
 #[derive(Parser, Debug)]

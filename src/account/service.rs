@@ -48,7 +48,7 @@ impl<P: PrismApi, D: AccountDatabase> AccountService<P, D> {
         username: &str,
     ) -> Result<Uuid, AccountServiceError> {
         self.account_db
-            .fetch_account_by_username(username)
+            .fetch_account_by_prism_identifier(username)
             .await?
             .map(|acc| acc.id)
             .ok_or(AccountServiceError::AccountNotFound)
