@@ -38,7 +38,6 @@ pub struct AccountInfoResponse {
 pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
     let public_router = OpenApiRouter::new().routes(routes!(head_account));
     let auth_router = OpenApiRouter::new()
-        .routes(routes!(get_account))
         .routes(routes!(update_apns_token))
         .layer(from_fn_with_state(context.clone(), require_auth));
 
@@ -68,29 +67,6 @@ async fn head_account(
         true => StatusCode::OK,
         false => StatusCode::NOT_FOUND,
     }
-}
-
-#[utoipa::path(
-    get,
-    path = "/account/{username}",
-    tag = ACCOUNTS_TAG,
-    params(("username" = String, Path, description = "Username of the account")),
-    responses(
-        (status = 200, description = "Account found", body = AccountInfoResponse),
-        (status = 404, description = "Account not found"),
-        (status = 500, description = "Internal error while getting account")
-    )
-)]
-async fn get_account(
-    Path(username_hash): Path<String>,
-    State(context): State<Arc<AppContext>>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
-    context
-        .account_service
-        .get_account_id_by_username(&username_hash)
-        .await
-        .map(|id| AccountInfoResponse { id })
-        .map(Json)
 }
 
 #[utoipa::path(

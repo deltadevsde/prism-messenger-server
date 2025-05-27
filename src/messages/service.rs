@@ -116,8 +116,6 @@ mod tests {
         MockNotificationGateway, NotificationError, dummy::DummyNotificationGateway,
     };
 
-    const ALICE_USERNAME: &str = "alice";
-    const BOB_USERNAME: &str = "bob";
     const ALICE_PUSH_TOKEN: &[u8] = b"alice_apns_token";
     const BOB_PUSH_TOKEN: &[u8] = b"bob_apns_token";
 
@@ -240,19 +238,10 @@ mod tests {
     async fn db_with_alice_and_bob() -> (InMemoryDatabase, Uuid, Uuid) {
         let db = InMemoryDatabase::new();
 
-        let alice_account = Account::new(
-            ALICE_USERNAME.to_string(),
-            "alice_auth_password",
-            Some(ALICE_PUSH_TOKEN.to_vec()),
-            None,
-        );
+        let alice_account =
+            Account::new("alice_auth_password", Some(ALICE_PUSH_TOKEN.to_vec()), None);
 
-        let bob_account = Account::new(
-            BOB_USERNAME.to_string(),
-            "bob_auth_password",
-            Some(BOB_PUSH_TOKEN.to_vec()),
-            None,
-        );
+        let bob_account = Account::new("bob_auth_password", Some(BOB_PUSH_TOKEN.to_vec()), None);
 
         // Store account UUIDs for test assertions
         let alice_id = alice_account.id;
@@ -353,7 +342,6 @@ mod tests {
             .times(1)
             .returning(|_| {
                 Ok(Some(Account::new(
-                    "recipient".to_string(),
                     "password",
                     Some(vec![1, 2, 3, 4]), // Device token
                     None,

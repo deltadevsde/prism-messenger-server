@@ -6,6 +6,7 @@ mod initialization;
 mod keys;
 mod messages;
 mod notifications;
+mod profiles;
 mod registration;
 mod settings;
 mod webserver;

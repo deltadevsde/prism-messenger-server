@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::{
@@ -14,12 +14,14 @@ use crate::{
         error::KeyError,
     },
     messages::{database::MessageDatabase, entities::Message, error::MessagingError},
+    profiles::{database::ProfileDatabase, entities::Profile, error::ProfileError},
 };
 
 pub struct InMemoryDatabase {
     pub accounts: Mutex<HashMap<Uuid, Account>>,
     pub key_bundles: Mutex<HashMap<Uuid, KeyBundle>>,
     pub messages: Mutex<HashMap<Uuid, Vec<Message>>>,
+    pub profiles: RwLock<HashMap<Uuid, Profile>>,
 }
 
 impl InMemoryDatabase {
@@ -28,6 +30,7 @@ impl InMemoryDatabase {
             accounts: Mutex::new(HashMap::new()),
             key_bundles: Mutex::new(HashMap::new()),
             messages: Mutex::new(HashMap::new()),
+            profiles: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -51,22 +54,6 @@ impl AccountDatabase for InMemoryDatabase {
             .map_err(|_| AccountDatabaseError::OperationFailed)?;
 
         let account = account_lock.get(&id).cloned();
-        Ok(account)
-    }
-
-    async fn fetch_account_by_username(
-        &self,
-        username: &str,
-    ) -> Result<Option<Account>, AccountDatabaseError> {
-        let account_lock = self
-            .accounts
-            .lock()
-            .map_err(|_| AccountDatabaseError::OperationFailed)?;
-
-        let account = account_lock
-            .values()
-            .find(|account| account.username == username)
-            .cloned();
         Ok(account)
     }
 
@@ -174,5 +161,62 @@ impl MessageDatabase for InMemoryDatabase {
         // Remove any messages whose message_id is in ids
         messages.retain(|msg| !ids.contains(&msg.message_id));
         Ok(messages.len() != original_len)
+    }
+}
+
+#[async_trait]
+impl ProfileDatabase for InMemoryDatabase {
+    async fn get_profile_by_id(&self, id: Uuid) -> Result<Option<Profile>, ProfileError> {
+        let profiles = self
+            .profiles
+            .read()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+        Ok(profiles.get(&id).cloned())
+    }
+
+    async fn get_profile_by_account_id(
+        &self,
+        account_id: Uuid,
+    ) -> Result<Option<Profile>, ProfileError> {
+        let profiles = self
+            .profiles
+            .read()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        // Find the profile with matching account_id
+        let matching_profile = profiles
+            .values()
+            .find(|profile| profile.account_id == account_id)
+            .cloned();
+        Ok(matching_profile)
+    }
+
+    async fn get_profile_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<Profile>, ProfileError> {
+        let profiles = self
+            .profiles
+            .read()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        // Find the profile with matching username
+        let matching_profile = profiles
+            .values()
+            .find(|profile| profile.username == username)
+            .cloned();
+        Ok(matching_profile)
+    }
+
+    async fn upsert_profile(&self, profile: Profile) -> Result<(), ProfileError> {
+        let mut profiles = self
+            .profiles
+            .write()
+            .map_err(|e| ProfileError::Database(e.to_string()))?;
+
+        // Store the profile, overwriting any existing profile with the same ID
+        profiles.insert(profile.id, profile.clone());
+
+        Ok(())
     }
 }

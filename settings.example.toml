@@ -15,9 +15,20 @@ key_id = "K12E34Y56"
 private_key = "~/.prism/AuthKey_K12E34Y56.p8"
 bundle_id = "com.whatever.PrismMessenger"
 
-[database]
+[database.core]
 type = "sqlite"
 path = "~/.prism/prism_messenger.sqlite"
+
+[database.ephemeral]
+type = "inmemory"
+
+[database.assets]
+type = "s3"
+bucket = "my-profile-pictures-bucket"
+region = "us-east-1"
+access_key = "YOUR_ACCESS_KEY"
+secret_key = "YOUR_SECRET_KEY"
+endpoint = "https://custom-endpoint.example.com"  # Optional
 
 [telemetry.metrics]
 enabled = false

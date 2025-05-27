@@ -13,13 +13,9 @@ pub enum AccountDatabaseError {
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
-pub trait AccountDatabase {
+pub trait AccountDatabase: Send + Sync {
     async fn upsert_account(&self, account: Account) -> Result<(), AccountDatabaseError>;
     async fn fetch_account(&self, id: Uuid) -> Result<Option<Account>, AccountDatabaseError>;
-    async fn fetch_account_by_username(
-        &self,
-        username: &str,
-    ) -> Result<Option<Account>, AccountDatabaseError>;
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError>;
     async fn update_apns_token(&self, id: Uuid, token: Vec<u8>)
     -> Result<(), AccountDatabaseError>;
