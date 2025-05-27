@@ -23,16 +23,12 @@ path = "~/.prism/prism_messenger.sqlite"
 type = "inmemory"
 
 [database.assets]
-type = "inmemory"
-
-# For S3 storage, use the following configuration:
-# [database.assets]
-# type = "s3"
-# bucket = "my-profile-pictures-bucket"
-# region = "us-east-1"
-# access_key = "YOUR_ACCESS_KEY"
-# secret_key = "YOUR_SECRET_KEY"
-# endpoint = "https://custom-endpoint.example.com"  # Optional
+type = "s3"
+bucket = "my-profile-pictures-bucket"
+region = "us-east-1"
+access_key = "YOUR_ACCESS_KEY"
+secret_key = "YOUR_SECRET_KEY"
+endpoint = "https://custom-endpoint.example.com"  # Optional
 
 [telemetry.metrics]
 enabled = false
