@@ -25,7 +25,6 @@ pub fn router(context: Arc<AppContext>) -> OpenApiRouter<Arc<AppContext>> {
         .routes(routes!(get_profile))
         .routes(routes!(get_profile_by_username))
         .routes(routes!(update_profile))
-        .routes(routes!(get_profile_picture_upload_url))
         .layer(from_fn_with_state(context.clone(), require_auth))
         .with_state(context)
 }
@@ -73,7 +72,7 @@ async fn get_profile_by_username(
 }
 
 #[utoipa::path(
-    put,
+    patch,
     path = "/",
     request_body = UpdateProfileRequest,
     responses(
@@ -101,25 +100,4 @@ async fn update_profile(
     };
 
     Ok(Json(upload_info).into_response())
-}
-
-#[utoipa::path(
-    get,
-    path = "/picture-upload-url",
-    responses(
-        (status = 200, description = "Upload URL generated successfully", body = ProfilePictureUploadResponse),
-        (status = 404, description = "Profile not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    tag = PROFILES_TAG
-)]
-async fn get_profile_picture_upload_url(
-    State(context): State<Arc<AppContext>>,
-    Extension(account): Extension<Account>,
-) -> Result<Json<ProfilePictureUploadResponse>, ProfileError> {
-    context
-        .profile_service
-        .generate_profile_picture_upload_url(account.id)
-        .await
-        .map(Json)
 }

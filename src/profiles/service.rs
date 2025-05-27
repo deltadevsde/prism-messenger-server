@@ -1,12 +1,11 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-
+use tracing::warn;
 use uuid::Uuid;
 
 use super::database::{ProfileDatabase, ProfilePictureStorage};
 use super::entities::{
-    Profile, ProfilePictureAction, ProfilePictureUploadResponse, ProfileResponse,
-    UpdateProfileRequest,
+    ProfilePictureAction, ProfilePictureUploadResponse, ProfileResponse, UpdateProfileRequest,
 };
 use super::error::ProfileError;
 
@@ -95,18 +94,24 @@ where
             ProfilePictureAction::Clear => {
                 // If there was a previous picture, delete it
                 if profile.profile_picture_url.is_some() {
-                    self.picture_storage
+                    if let Err(err) = self
+                        .picture_storage
                         .delete_profile_picture(profile.id)
-                        .await?;
+                        .await
+                    {
+                        warn!("Failed to delete profile picture: {}", err);
+                    }
                 }
                 profile.profile_picture_url = None;
             }
             ProfilePictureAction::Update => {
                 // If there was a previous picture, delete it
-                if profile.profile_picture_url.is_some() {
-                    self.picture_storage
-                        .delete_profile_picture(profile.id)
-                        .await?;
+                if let Err(err) = self
+                    .picture_storage
+                    .delete_profile_picture(profile.id)
+                    .await
+                {
+                    warn!("Failed to delete profile picture: {}", err);
                 }
 
                 // Generate upload URL once and use it for both updating profile and returning to client
@@ -136,42 +141,5 @@ where
 
         // Return the upload response if available
         Ok(upload_response)
-    }
-
-    /// Generate a pre-signed URL for uploading a profile picture
-    pub async fn generate_profile_picture_upload_url(
-        &self,
-        account_id: Uuid,
-    ) -> Result<ProfilePictureUploadResponse, ProfileError> {
-        // Get the profile to ensure it exists and to get the ID
-        let profile = match self
-            .profile_db
-            .get_profile_by_account_id(account_id)
-            .await?
-        {
-            Some(profile) => profile,
-            None => return Err(ProfileError::NotFound),
-        };
-
-        // Call the helper method to generate the upload URL
-        self.generate_profile_picture_upload_url_from_profile(&profile)
-            .await
-    }
-
-    /// Generate a pre-signed URL for uploading a profile picture from an existing profile
-    async fn generate_profile_picture_upload_url_from_profile(
-        &self,
-        profile: &Profile,
-    ) -> Result<ProfilePictureUploadResponse, ProfileError> {
-        // Generate the upload URL from S3
-        let (upload_url, picture_url, expires_in) =
-            self.picture_storage.generate_upload_url(profile.id).await?;
-
-        // Return the response
-        Ok(ProfilePictureUploadResponse {
-            upload_url,
-            picture_url,
-            expires_in,
-        })
     }
 }
