@@ -70,6 +70,13 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 # CLI
 clap = { version = "4.5.2", features = ["derive"] }
 
+# telemetry
+prism-telemetry = "0.2.0"
+opentelemetry = "0.29.1"
+opentelemetry_sdk = "0.29.0"
+parking_lot = "0.12.3"
+lazy_static = "1.4.0"
+
 # Testing
 mockall = "0.13.1"
 chrono = "0.4.39"
