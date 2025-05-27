@@ -14,11 +14,7 @@ use crate::{
         error::KeyError,
     },
     messages::{database::MessageDatabase, entities::Message, error::MessagingError},
-    profiles::{
-        database::{ProfileDatabase, ProfilePictureStorage},
-        entities::Profile,
-        error::ProfileError,
-    },
+    profiles::{database::ProfileDatabase, entities::Profile, error::ProfileError},
 };
 
 pub struct InMemoryDatabase {
@@ -26,7 +22,6 @@ pub struct InMemoryDatabase {
     pub key_bundles: Mutex<HashMap<Uuid, KeyBundle>>,
     pub messages: Mutex<HashMap<Uuid, Vec<Message>>>,
     pub profiles: RwLock<HashMap<Uuid, Profile>>,
-    pub profile_picture_urls: RwLock<HashMap<Uuid, String>>,
 }
 
 impl InMemoryDatabase {
@@ -36,7 +31,6 @@ impl InMemoryDatabase {
             key_bundles: Mutex::new(HashMap::new()),
             messages: Mutex::new(HashMap::new()),
             profiles: RwLock::new(HashMap::new()),
-            profile_picture_urls: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -62,8 +56,6 @@ impl AccountDatabase for InMemoryDatabase {
         let account = account_lock.get(&id).cloned();
         Ok(account)
     }
-
-
 
     async fn remove_account(&self, id: Uuid) -> Result<(), AccountDatabaseError> {
         let mut account_lock = self
@@ -224,40 +216,6 @@ impl ProfileDatabase for InMemoryDatabase {
 
         // Store the profile, overwriting any existing profile with the same ID
         profiles.insert(profile.id, profile.clone());
-
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl ProfilePictureStorage for InMemoryDatabase {
-    async fn generate_upload_url(
-        &self,
-        profile_id: Uuid,
-    ) -> Result<(String, String, u64), ProfileError> {
-        // For in-memory, we'll just create URLs that don't actually work,
-        // but would be replaced by real S3 URLs in production
-        let upload_url = format!("https://example.com/upload/{}", profile_id);
-        let picture_url = format!("https://example.com/images/{}", profile_id);
-        let expires_in = 300; // 5 minutes in seconds
-
-        // Remember the picture URL for this profile
-        let mut picture_urls = self
-            .profile_picture_urls
-            .write()
-            .map_err(|e| ProfileError::Database(e.to_string()))?;
-        picture_urls.insert(profile_id, picture_url.clone());
-
-        Ok((upload_url, picture_url, expires_in))
-    }
-
-    async fn delete_profile_picture(&self, profile_id: Uuid) -> Result<(), ProfileError> {
-        let mut picture_urls = self
-            .profile_picture_urls
-            .write()
-            .map_err(|e| ProfileError::Database(e.to_string()))?;
-
-        picture_urls.remove(&profile_id);
 
         Ok(())
     }
