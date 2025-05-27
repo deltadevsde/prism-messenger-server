@@ -64,7 +64,9 @@ impl ProfilePictureStorage for S3Storage {
         &self,
         profile_id: Uuid,
     ) -> Result<(String, String, u64), ProfileError> {
-        let object_key = format!("profiles/{}/profile.jpg", profile_id);
+        // Generate a UUID v4 for the profile picture
+        let profile_picture_id = Uuid::new_v4();
+        let object_key = format!("profile-picture/{}.jpg", profile_picture_id);
         let expires_in = 300; // 5 minutes in seconds
 
         // Create a presigned PUT URL for uploading
@@ -105,7 +107,7 @@ impl ProfilePictureStorage for S3Storage {
     }
 
     async fn delete_profile_picture(&self, profile_id: Uuid) -> Result<(), ProfileError> {
-        let object_key = format!("profile-pictures/{}.jpg", profile_id);
+        let object_key = format!("profile-picture/{}.jpg", profile_id);
 
         // Delete the object from S3
         self.client
@@ -115,7 +117,7 @@ impl ProfilePictureStorage for S3Storage {
             .send()
             .await
             .map_err(|err| {
-                ProfileError::Database(format!("Failed to delete profile picture: {}", err))
+                ProfileError::Database(format!("Failed to delete profile picture on S3: {}", err))
             })?;
 
         Ok(())
