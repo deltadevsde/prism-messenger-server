@@ -3,6 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use thiserror::Error;
+use tracing::error;
 use uuid::Error as UuidError;
 
 use crate::{account::database::AccountDatabaseError, notifications::gateway::NotificationError};
@@ -17,7 +18,7 @@ pub enum MessagingError {
 
     #[error("Notification delivery failed: {0}")]
     NotificationError(String),
-    
+
     #[error("Parse error: {0}")]
     ParseError(String),
 }
@@ -47,6 +48,7 @@ impl From<UuidError> for MessagingError {
 
 impl IntoResponse for MessagingError {
     fn into_response(self) -> Response {
+        error!("{}", self);
         let status = match self {
             MessagingError::UserNotFound(_) => StatusCode::BAD_REQUEST,
             MessagingError::ParseError(_) => StatusCode::BAD_REQUEST,

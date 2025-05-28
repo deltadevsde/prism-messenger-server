@@ -3,9 +3,9 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use prism_client::PrismApi;
 use std::sync::Arc;
+use tracing::error;
 use uuid::Uuid;
 
-use super::entities::Account;
 use crate::account::database::{AccountDatabase, AccountDatabaseError};
 
 #[derive(Debug, thiserror::Error)]
@@ -19,6 +19,7 @@ pub enum AccountServiceError {
 
 impl IntoResponse for AccountServiceError {
     fn into_response(self) -> Response {
+        error!("{}", self);
         let status = match self {
             AccountServiceError::AccountNotFound => StatusCode::NOT_FOUND,
             AccountServiceError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -38,7 +39,15 @@ impl<P: PrismApi, D: AccountDatabase> AccountService<P, D> {
     }
 
     pub async fn username_exists(&self, username: &str) -> Result<bool> {
-        let account_res = self.prism.clone().get_account(username).await?;
+        let account_res = self
+            .prism
+            .clone()
+            .get_account(username)
+            .await
+            .map_err(|err| {
+                error!("Failed to get prism account '{}': {}", username, err);
+                err
+            })?;
 
         Ok(account_res.account.is_some())
     }
