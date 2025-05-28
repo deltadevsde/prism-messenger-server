@@ -1,6 +1,10 @@
-use axum::{http::StatusCode, response::IntoResponse};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::Serialize;
 use thiserror::Error;
+use tracing::error;
 
 use crate::account::database::AccountDatabaseError;
 
@@ -35,7 +39,8 @@ impl From<sqlx::Error> for ProfileError {
 }
 
 impl IntoResponse for ProfileError {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
+        error!("{}", self);
         let status = match &self {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,

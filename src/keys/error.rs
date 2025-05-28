@@ -3,6 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use thiserror::Error;
+use tracing::error;
 
 #[derive(Debug, Error)]
 pub enum KeyError {
@@ -33,6 +34,7 @@ impl From<anyhow::Error> for KeyError {
 
 impl IntoResponse for KeyError {
     fn into_response(self) -> Response {
+        error!("{}", self);
         let status = match self {
             KeyError::ValidationError(_) => StatusCode::BAD_REQUEST,
             KeyError::NotFound(_) => StatusCode::NOT_FOUND,
