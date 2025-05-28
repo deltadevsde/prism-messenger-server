@@ -6,6 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use std::sync::Arc;
+use tracing::error;
 
 use super::header::AuthHeader;
 use crate::context::AppContext;
@@ -21,10 +22,16 @@ pub async fn require_auth(
         .headers()
         .get("Authorization")
         .and_then(|header| header.to_str().ok())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+        .ok_or_else(|| {
+            error!("Missing or invalid Authorization header");
+            StatusCode::UNAUTHORIZED
+        })?;
 
     // Parse Basic auth credentials
-    let auth_header = AuthHeader::parse(auth_header_str).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let auth_header = AuthHeader::parse(auth_header_str).map_err(|_| {
+        error!("Failed to parse Authorization header");
+        StatusCode::UNAUTHORIZED
+    })?;
 
     // Verify credentials against database
     let Ok(authenticated_account) = context
@@ -32,6 +39,7 @@ pub async fn require_auth(
         .authenticate(&auth_header.username, &auth_header.password)
         .await
     else {
+        error!("Failed to authenticate user: {}", auth_header.username);
         return Err(StatusCode::UNAUTHORIZED);
     };
 
