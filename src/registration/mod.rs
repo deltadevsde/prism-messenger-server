@@ -1,6 +1,7 @@
 pub mod entities;
 pub mod error;
-mod router;
-pub mod service;
+pub mod phone_number;
+pub mod username;
 
-pub use router::router;
+pub use phone_number::phone_router;
+pub use username::router;

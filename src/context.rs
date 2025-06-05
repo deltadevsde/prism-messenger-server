@@ -12,7 +12,7 @@ use crate::{
     messages::service::MessagingService,
     notifications::gateway::apns::ApnsNotificationGateway,
     profiles::service::ProfileService,
-    registration::service::RegistrationService,
+    registration::{phone_number::PhoneRegistrationService, username::UsernameRegistrationService},
     settings::{AssetsDatabaseSettings, CoreDatabaseSettings, EphemeralDatabaseSettings, Settings},
 };
 
@@ -23,7 +23,10 @@ pub struct AppContext {
     pub messaging_service:
         MessagingService<SqliteDatabase, InMemoryDatabase, ApnsNotificationGateway>,
     pub profile_service: ProfileService<SqliteDatabase, S3Storage>,
-    pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase, SqliteDatabase>,
+    pub username_registration_service:
+        UsernameRegistrationService<PrismHttpClient, SqliteDatabase, SqliteDatabase>,
+    pub phone_registration_service:
+        PhoneRegistrationService<PrismHttpClient, SqliteDatabase, SqliteDatabase>,
     pub initialization_service: InitializationService<PrismHttpClient>,
 }
 
@@ -87,11 +90,20 @@ impl AppContext {
         // Services
         let account_service = AccountService::new(prism_arc.clone(), core_db.clone());
         let auth_service = AuthService::new(core_db.clone());
-        let registration_service = RegistrationService::new(
+        let username_registration_service = UsernameRegistrationService::new(
             prism_arc.clone(),
             signing_key.clone(),
             core_db.clone(),
             core_db.clone(),
+        );
+        let phone_registration_service = PhoneRegistrationService::new(
+            prism_arc.clone(),
+            core_db.clone(),
+            core_db.clone(),
+            signing_key.clone(),
+            settings.twilio.account_sid.clone(),
+            settings.twilio.auth_token.clone(),
+            settings.twilio.verify_service_sid.clone(),
         );
         let key_service = KeyService::new(prism_arc.clone(), core_db.clone());
         let messaging_service =
@@ -102,7 +114,8 @@ impl AppContext {
         Ok(Self {
             account_service,
             auth_service,
-            registration_service,
+            username_registration_service,
+            phone_registration_service,
             key_service,
             messaging_service,
             profile_service,

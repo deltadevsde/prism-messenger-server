@@ -25,6 +25,7 @@ use crate::telemetry::metrics_registry::get_metrics;
 use crate::telemetry::init::init;
 
 pub static PRISM_MESSENGER_SERVICE_ID: &str = "prism_messenger";
+pub static PRISM_PHONE_SERVICE_ID: &str = "prism_phone";
 
 /// Command line arguments for the Prism Messenger Server
 #[derive(Parser, Debug)]

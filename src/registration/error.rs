@@ -13,6 +13,14 @@ pub enum RegistrationError {
     ProcessingFailed(String),
     #[error("Push token is missing")]
     MissingPushToken,
+    #[error("Invalid phone number format")]
+    InvalidPhoneNumber,
+    #[error("OTP verification failed")]
+    OtpVerificationFailed,
+    #[error("Phone registration session not found or expired")]
+    PhoneSessionNotFound,
+    #[error("Twilio error: {0}")]
+    TwilioError(String),
 }
 
 impl From<TransactionError> for RegistrationError {
@@ -44,6 +52,10 @@ impl IntoResponse for RegistrationError {
         error!("{}", self);
         let status = match self {
             RegistrationError::MissingPushToken => StatusCode::BAD_REQUEST,
+            RegistrationError::InvalidPhoneNumber => StatusCode::BAD_REQUEST,
+            RegistrationError::OtpVerificationFailed => StatusCode::BAD_REQUEST,
+            RegistrationError::PhoneSessionNotFound => StatusCode::BAD_REQUEST,
+            RegistrationError::TwilioError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             RegistrationError::ProcessingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         status.into_response()

@@ -3,14 +3,14 @@ use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKe
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, trace};
 
-use super::{entities::RegistrationChallenge, error::RegistrationError};
+use crate::registration::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
     PRISM_MESSENGER_SERVICE_ID,
     account::{database::AccountDatabase, entities::Account},
     profiles::{database::ProfileDatabase, entities::Profile},
 };
 
-pub struct RegistrationService<P, AD, PD>
+pub struct UsernameRegistrationService<P, AD, PD>
 where
     P: PrismApi,
     AD: AccountDatabase,
@@ -22,7 +22,7 @@ where
     profile_database: Arc<PD>,
 }
 
-impl<P, AD, PD> RegistrationService<P, AD, PD>
+impl<P, AD, PD> UsernameRegistrationService<P, AD, PD>
 where
     P: PrismApi,
     AD: AccountDatabase,
@@ -134,7 +134,7 @@ mod tests {
     use crate::{
         account::database::MockAccountDatabase,
         profiles::database::MockProfileDatabase,
-        registration::{error::RegistrationError, service::RegistrationService},
+        registration::{error::RegistrationError, username::service::UsernameRegistrationService},
     };
 
     #[tokio::test]
@@ -168,7 +168,7 @@ mod tests {
             });
 
         // Wrap the configured mocks in Arc and create the service
-        let service = RegistrationService::new(
+        let service = UsernameRegistrationService::new(
             Arc::new(mock_prism),
             service_signing_key.clone(),
             Arc::new(mock_account_db),
@@ -227,7 +227,7 @@ mod tests {
             .returning(|_| Ok(()));
 
         // Create the service
-        let service = RegistrationService::new(
+        let service = UsernameRegistrationService::new(
             Arc::new(mock_prism),
             service_signing_key.clone(),
             Arc::new(mock_account_db),
