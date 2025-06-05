@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, instrument};
 use phonenumber::{parse, Mode};
 
-use super::{entities::RegistrationChallenge, error::RegistrationError};
+use crate::registration::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
     PRISM_PHONE_SERVICE_ID,
     account::{database::AccountDatabase, entities::Account},

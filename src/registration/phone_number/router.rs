@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-use super::entities::RegistrationChallenge;
+use crate::registration::entities::RegistrationChallenge;
 use crate::context::AppContext;
 
 const PHONE_REGISTRATION_TAG: &str = "phone_registration";

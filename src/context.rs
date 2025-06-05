@@ -12,7 +12,7 @@ use crate::{
     messages::service::MessagingService,
     notifications::gateway::apns::ApnsNotificationGateway,
     profiles::service::ProfileService,
-    registration::{service::RegistrationService, phone_service::PhoneRegistrationService},
+    registration::{username::RegistrationService, phone_number::PhoneRegistrationService},
     settings::{AssetsDatabaseSettings, CoreDatabaseSettings, EphemeralDatabaseSettings, Settings},
 };
 

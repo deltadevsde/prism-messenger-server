@@ -3,7 +3,7 @@ use prism_client::{PrismApi, Signature, SignatureBundle, SigningKey, VerifyingKe
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, trace};
 
-use super::{entities::RegistrationChallenge, error::RegistrationError};
+use crate::registration::{entities::RegistrationChallenge, error::RegistrationError};
 use crate::{
     PRISM_MESSENGER_SERVICE_ID,
     account::{database::AccountDatabase, entities::Account},
@@ -134,7 +134,7 @@ mod tests {
     use crate::{
         account::database::MockAccountDatabase,
         profiles::database::MockProfileDatabase,
-        registration::{error::RegistrationError, service::RegistrationService},
+        registration::{error::RegistrationError, username::service::RegistrationService},
     };
 
     #[tokio::test]
