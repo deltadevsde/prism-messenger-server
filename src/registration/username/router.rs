@@ -9,10 +9,10 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 use uuid::Uuid;
 
-use crate::registration::entities::RegistrationChallenge;
 use crate::context::AppContext;
+use crate::registration::entities::RegistrationChallenge;
 
-const REGISTRATION_TAG: &str = "registration";
+const REGISTRATION_TAG: &str = "username_registration";
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -81,7 +81,7 @@ async fn post_request_registration(
     Json(req): Json<RequestRegistrationRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
-        .registration_service
+        .username_registration_service
         .request_registration(req.username, req.key)
         .await
         .map(RequestRegistrationResponse::from)
@@ -102,9 +102,8 @@ async fn post_finalize_registration(
     State(context): State<Arc<AppContext>>,
     Json(req): Json<FinalizeRegistrationRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-
     context
-        .registration_service
+        .username_registration_service
         .finalize_registration(
             req.username,
             req.key,
