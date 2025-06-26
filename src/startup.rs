@@ -9,7 +9,10 @@ use crate::{
         inmemory::InMemoryDatabase, pool::create_sqlite_pool, s3::S3Storage, sqlite::SqliteDatabase,
     },
     keys::service::KeyService,
-    messages::{messaging_service::MessagingService, sender_service::MessageSenderService},
+    messages::{
+        messaging_service::MessagingService, sender_service::MessageSenderService,
+        typing::service::TypingService,
+    },
     notifications::{gateway::apns::ApnsNotificationGateway, service::NotificationService},
     presence::{service::PresenceService, update_service::PresenceUpdateService},
     profiles::service::ProfileService,
@@ -122,6 +125,9 @@ pub async fn start_application(settings: &Settings) -> Result<AppContext> {
     );
     let message_sender_service_arc = Arc::new(message_sender_service);
 
+    let typing_service = TypingService::new(websocket_center_arc.clone());
+    let typing_service_arc = Arc::new(typing_service);
+
     let presence_service = PresenceService::new(websocket_center_arc.clone());
     let presence_update_service = PresenceUpdateService::new(websocket_center_arc.clone());
     let presence_update_service_arc = Arc::new(presence_update_service);
@@ -129,6 +135,7 @@ pub async fn start_application(settings: &Settings) -> Result<AppContext> {
     let profile_service = ProfileService::new(core_db.clone(), assets_db.clone());
 
     message_sender_service_arc.spawn_message_sender();
+    typing_service_arc.handle_typing_updates().await;
     presence_update_service_arc
         .clone()
         .handle_presence_updates()
