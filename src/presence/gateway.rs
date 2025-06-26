@@ -2,17 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::entities::PresenceStatus;
-
-#[derive(Debug, thiserror::Error)]
-pub enum PresenceGatewayError {
-    #[error("Failed to send presence update: {0}")]
-    SendFailed(String),
-    #[error("Connection not found for account {0}")]
-    ConnectionNotFound(Uuid),
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-}
+use super::{entities::PresenceStatus, error::PresenceError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PresenceUpdate {
@@ -33,7 +23,7 @@ pub trait PresenceGateway: Send + Sync {
     async fn send_presence_update(
         &self,
         presence_update: &PresenceUpdate,
-    ) -> Result<(), PresenceGatewayError>;
+    ) -> Result<(), PresenceError>;
 
     async fn register_presence_handler<H>(&self, handler: H)
     where

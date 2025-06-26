@@ -17,7 +17,7 @@ use crate::{
         database::PresenceDatabase,
         entities::PresenceStatus,
         error::PresenceError,
-        gateway::{PresenceGateway, PresenceGatewayError, PresenceUpdate},
+        gateway::{PresenceGateway, PresenceUpdate},
     },
 };
 
@@ -35,34 +35,6 @@ pub enum WebSocketError {
 impl From<SendError<Vec<u8>>> for WebSocketError {
     fn from(err: SendError<Vec<u8>>) -> Self {
         WebSocketError::SendingFailed(err.to_string())
-    }
-}
-
-impl From<WebSocketError> for MessageGatewayError {
-    fn from(err: WebSocketError) -> Self {
-        match err {
-            WebSocketError::ConnectionNotFound(account_id) => {
-                MessageGatewayError::ConnectionNotFound(account_id.parse().unwrap_or_default())
-            }
-            WebSocketError::SerializationFailed(msg) => {
-                MessageGatewayError::SerializationError(msg)
-            }
-            WebSocketError::SendingFailed(msg) => MessageGatewayError::SendFailed(msg),
-        }
-    }
-}
-
-impl From<WebSocketError> for PresenceGatewayError {
-    fn from(err: WebSocketError) -> Self {
-        match err {
-            WebSocketError::ConnectionNotFound(account_id) => {
-                PresenceGatewayError::ConnectionNotFound(account_id.parse().unwrap_or_default())
-            }
-            WebSocketError::SerializationFailed(msg) => {
-                PresenceGatewayError::SerializationError(msg)
-            }
-            WebSocketError::SendingFailed(msg) => PresenceGatewayError::SendFailed(msg),
-        }
     }
 }
 
@@ -322,7 +294,7 @@ impl PresenceGateway for WebSocketCenter {
     async fn send_presence_update(
         &self,
         presence_update: &PresenceUpdate,
-    ) -> Result<(), PresenceGatewayError> {
+    ) -> Result<(), PresenceError> {
         let ws_message = PresenceWebSocketMessage::new(presence_update);
 
         // For now, we'll broadcast to all connections
@@ -358,6 +330,19 @@ impl PresenceGateway for WebSocketCenter {
                 Ok(())
             })
             .await;
+        }
+    }
+}
+
+impl From<WebSocketError> for PresenceError {
+    fn from(err: WebSocketError) -> Self {
+        match err {
+            WebSocketError::ConnectionNotFound(account_id) => {
+                PresenceError::AccountNotFound(account_id.parse().unwrap_or_default())
+            }
+            WebSocketError::SerializationFailed(msg) | WebSocketError::SendingFailed(msg) => {
+                PresenceError::SendingFailed(msg)
+            }
         }
     }
 }

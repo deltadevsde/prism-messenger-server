@@ -4,14 +4,9 @@ use uuid::Uuid;
 
 use super::{
     entities::PresenceStatus,
-    gateway::{PresenceGateway, PresenceGatewayError, PresenceUpdate},
+    error::PresenceError,
+    gateway::{PresenceGateway, PresenceUpdate},
 };
-
-#[derive(Debug, thiserror::Error)]
-pub enum PresenceUpdateServiceError {
-    #[error("Presence gateway error: {0}")]
-    PresenceGateway(#[from] PresenceGatewayError),
-}
 
 pub struct PresenceUpdateService<G>
 where
@@ -19,21 +14,6 @@ where
 {
     presence_gateway: Arc<G>,
 }
-
-// pub trait PresenceHandlerGateway: Send + Sync {
-//     fn register_connect_handler<H>(
-//         &self,
-//         handler: H,
-//     ) -> impl std::future::Future<Output = ()> + Send
-//     where
-//         H: Fn(Uuid) -> Result<(), Box<dyn Error>> + Send + Sync + 'static;
-//     fn register_disconnect_handler<H>(
-//         &self,
-//         handler: H,
-//     ) -> impl std::future::Future<Output = ()> + Send
-//     where
-//         H: Fn(Uuid) -> Result<(), Box<dyn Error>> + Send + Sync + 'static;
-// }
 
 impl<G> PresenceUpdateService<G>
 where
@@ -47,7 +27,7 @@ where
     pub async fn handle_connection_established(
         &self,
         account_id: Uuid,
-    ) -> Result<(), PresenceUpdateServiceError> {
+    ) -> Result<(), PresenceError> {
         let presence_update = PresenceUpdate::new(account_id, PresenceStatus::Online);
         self.presence_gateway
             .send_presence_update(&presence_update)
@@ -56,10 +36,7 @@ where
     }
 
     #[instrument(skip(self))]
-    pub async fn handle_connection_closed(
-        &self,
-        account_id: Uuid,
-    ) -> Result<(), PresenceUpdateServiceError> {
+    pub async fn handle_connection_closed(&self, account_id: Uuid) -> Result<(), PresenceError> {
         let presence_update = PresenceUpdate::new(account_id, PresenceStatus::Offline);
         self.presence_gateway
             .send_presence_update(&presence_update)
@@ -130,7 +107,7 @@ mod tests {
         mock_gateway
             .expect_send_presence_update()
             .times(1)
-            .returning(|_| Err(PresenceGatewayError::SendFailed("Test error".to_string())));
+            .returning(|_| Err(PresenceError::SendingFailed("Test error".to_string())));
 
         let service = PresenceUpdateService::new(Arc::new(mock_gateway));
 
@@ -146,7 +123,7 @@ mod tests {
         mock_gateway
             .expect_send_presence_update()
             .times(1)
-            .returning(|_| Err(PresenceGatewayError::SendFailed("Test error".to_string())));
+            .returning(|_| Err(PresenceError::SendingFailed("Test error".to_string())));
 
         let service = PresenceUpdateService::new(Arc::new(mock_gateway));
 
