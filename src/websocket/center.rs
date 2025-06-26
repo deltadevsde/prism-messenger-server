@@ -8,9 +8,17 @@ use tokio::sync::{
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::messages::{
-    entities::Message,
-    gateway::{MessageGateway, MessageGatewayError},
+use crate::{
+    messages::{
+        entities::Message,
+        gateway::{MessageGateway, MessageGatewayError},
+    },
+    presence::{
+        database::PresenceDatabase,
+        entities::PresenceStatus,
+        error::PresenceError,
+        gateway::{PresenceGateway, PresenceGatewayError, PresenceUpdate},
+    },
 };
 
 /// Errors that can occur during WebSocket operations
@@ -40,6 +48,20 @@ impl From<WebSocketError> for MessageGatewayError {
                 MessageGatewayError::SerializationError(msg)
             }
             WebSocketError::SendingFailed(msg) => MessageGatewayError::SendFailed(msg),
+        }
+    }
+}
+
+impl From<WebSocketError> for PresenceGatewayError {
+    fn from(err: WebSocketError) -> Self {
+        match err {
+            WebSocketError::ConnectionNotFound(account_id) => {
+                PresenceGatewayError::ConnectionNotFound(account_id.parse().unwrap_or_default())
+            }
+            WebSocketError::SerializationFailed(msg) => {
+                PresenceGatewayError::SerializationError(msg)
+            }
+            WebSocketError::SendingFailed(msg) => PresenceGatewayError::SendFailed(msg),
         }
     }
 }
@@ -259,6 +281,84 @@ impl MessageGateway for WebSocketCenter {
         let ws_message = MessageWebSocketMessage::new(message);
         self.send_to_account(recipient_id, &ws_message).await?;
         Ok(())
+    }
+}
+
+// Presence
+
+#[async_trait]
+impl PresenceDatabase for WebSocketCenter {
+    async fn is_present(&self, account_id: &Uuid) -> Result<bool, PresenceError> {
+        Ok(self.has_connection(account_id).await)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PresenceWebSocketMessage {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub account_id: Uuid,
+    pub status: String,
+}
+
+impl PresenceWebSocketMessage {
+    pub fn new(presence_update: &PresenceUpdate) -> Self {
+        let status = match presence_update.status {
+            PresenceStatus::Online => "online".to_string(),
+            PresenceStatus::Offline => "offline".to_string(),
+        };
+
+        Self {
+            message_type: "presence".to_string(),
+            account_id: presence_update.account_id,
+            status,
+        }
+    }
+}
+
+#[async_trait]
+impl PresenceGateway for WebSocketCenter {
+    async fn send_presence_update(
+        &self,
+        presence_update: &PresenceUpdate,
+    ) -> Result<(), PresenceGatewayError> {
+        let ws_message = PresenceWebSocketMessage::new(presence_update);
+
+        // For now, we'll broadcast to all connections
+        // In a real implementation, you might want to send only to interested parties
+        self.broadcast_to_all(&ws_message).await?;
+
+        Ok(())
+    }
+
+    async fn register_presence_handler<H>(&self, handler: H)
+    where
+        H: Fn(PresenceUpdate) + Send + Sync + 'static,
+    {
+        let handler = Arc::new(handler);
+
+        // Register connect handler for Online status
+        {
+            let handler = Arc::clone(&handler);
+            self.register_connect_handler(move |account_id| {
+                let presence_update = PresenceUpdate::new(account_id, PresenceStatus::Online);
+                handler(presence_update);
+                Ok(())
+            })
+            .await;
+        }
+
+        // Register disconnect handler for Offline status
+        {
+            let handler = Arc::clone(&handler);
+            self.register_disconnect_handler(move |account_id| {
+                let presence_update = PresenceUpdate::new(account_id, PresenceStatus::Offline);
+                handler(presence_update);
+                Ok(())
+            })
+            .await;
+        }
     }
 }
 
