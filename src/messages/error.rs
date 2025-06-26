@@ -21,6 +21,9 @@ pub enum MessagingError {
 
     #[error("Parse error: {0}")]
     ParseError(String),
+
+    #[error("Sending failed: {0}")]
+    SendingFailed(String),
 }
 
 impl From<AccountDatabaseError> for MessagingError {

@@ -9,10 +9,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
-    messages::{
-        entities::Message,
-        gateway::{MessageGateway, MessageGatewayError},
-    },
+    messages::{entities::Message, error::MessagingError, gateway::MessageGateway},
     presence::{
         database::PresenceDatabase,
         entities::PresenceStatus,
@@ -248,11 +245,24 @@ impl MessageWebSocketMessage {
 
 #[async_trait]
 impl MessageGateway for WebSocketCenter {
-    async fn send_message(&self, message: Message) -> Result<(), MessageGatewayError> {
+    async fn send_message(&self, message: Message) -> Result<(), MessagingError> {
         let recipient_id = message.recipient_id;
         let ws_message = MessageWebSocketMessage::new(message);
         self.send_to_account(recipient_id, &ws_message).await?;
         Ok(())
+    }
+}
+
+impl From<WebSocketError> for MessagingError {
+    fn from(err: WebSocketError) -> Self {
+        match err {
+            WebSocketError::SerializationFailed(msg) | WebSocketError::SendingFailed(msg) => {
+                MessagingError::SendingFailed(msg)
+            }
+            WebSocketError::ConnectionNotFound(account_id) => {
+                MessagingError::UserNotFound(account_id)
+            }
+        }
     }
 }
 

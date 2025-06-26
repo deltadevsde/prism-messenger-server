@@ -4,7 +4,6 @@ use tokio::time::interval;
 use tracing::{debug, error, info, instrument, warn};
 
 use super::{database::MessageDatabase, error::MessagingError, gateway::MessageGateway};
-use crate::messages::gateway::MessageGatewayError;
 
 pub struct MessageSenderService<D, G>
 where
@@ -64,9 +63,9 @@ where
                     self.messages_db
                         .remove_messages(recipient_id, vec![message_id])?;
                 }
-                Err(MessageGatewayError::RecipientNotConnected(account_id)) => {
+                Err(MessagingError::UserNotFound(account_id)) => {
                     // Recipient is not connected, leave message in database for later delivery
-                    debug!("Recipient {} not connected. Doing nothing", account_id);
+                    debug!("Recipient {} not found. Doing nothing", account_id);
                     continue;
                 }
                 Err(e) => {
@@ -163,11 +162,7 @@ mod tests {
             .expect_send_message()
             .once()
             .with(always())
-            .returning(|_| {
-                Err(MessageGatewayError::RecipientNotConnected(
-                    "test".to_string(),
-                ))
-            });
+            .returning(|_| Err(MessagingError::UserNotFound("test".to_string())));
 
         let service = MessageSenderService::new(
             Arc::new(mock_db),
@@ -205,7 +200,7 @@ mod tests {
             .once()
             .with(always())
             .returning(|_| {
-                Err(MessageGatewayError::SendingFailed(
+                Err(MessagingError::SendingFailed(
                     "Connection closed".to_string(),
                 ))
             });
