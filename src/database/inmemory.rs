@@ -127,7 +127,7 @@ impl KeyDatabase for InMemoryDatabase {
 }
 
 impl MessageDatabase for InMemoryDatabase {
-    fn insert_message(&self, message: Message) -> Result<bool, MessagingError> {
+    fn insert_message(&self, message: Message) -> Result<(), MessagingError> {
         let mut messages_lock = self.messages.lock().map_err(|e| {
             MessagingError::DatabaseError(format!("Lock poisoned during message storage: {}", e))
         })?;
@@ -135,18 +135,26 @@ impl MessageDatabase for InMemoryDatabase {
             .entry(message.recipient_id)
             .or_insert_with(Vec::new)
             .push(message);
-        Ok(true)
+        Ok(())
     }
 
-    fn get_messages(&self, account_id: Uuid) -> Result<Vec<Message>, MessagingError> {
+    fn get_all_messages(&self) -> Result<Vec<Message>, MessagingError> {
         let messages_lock = self.messages.lock().map_err(|e| {
             MessagingError::DatabaseError(format!("Lock poisoned during message retrieval: {}", e))
         })?;
-        // Return a cloned vector of messages (if any) so that users can work on their own copy.
+        // Return a cloned vector of messages
+        Ok(messages_lock.values().flatten().cloned().collect())
+    }
+
+    fn get_messages_for_account(&self, account_id: Uuid) -> Result<Vec<Message>, MessagingError> {
+        let messages_lock = self.messages.lock().map_err(|e| {
+            MessagingError::DatabaseError(format!("Lock poisoned during message retrieval: {}", e))
+        })?;
+        // Return a cloned vector of messages for a specific account
         Ok(messages_lock.get(&account_id).cloned().unwrap_or_default())
     }
 
-    fn mark_delivered(&self, account_id: Uuid, ids: Vec<Uuid>) -> Result<bool, MessagingError> {
+    fn remove_messages(&self, account_id: Uuid, ids: Vec<Uuid>) -> Result<(), MessagingError> {
         let mut messages_lock = self.messages.lock().map_err(|e| {
             MessagingError::DatabaseError(format!(
                 "Lock poisoned during message delivery status update: {}",
@@ -154,13 +162,12 @@ impl MessageDatabase for InMemoryDatabase {
             ))
         })?;
         let Some(messages) = messages_lock.get_mut(&account_id) else {
-            return Ok(false);
+            return Ok(());
         };
 
-        let original_len = messages.len();
         // Remove any messages whose message_id is in ids
         messages.retain(|msg| !ids.contains(&msg.message_id));
-        Ok(messages.len() != original_len)
+        Ok(())
     }
 }
 
