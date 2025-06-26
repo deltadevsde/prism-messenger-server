@@ -11,6 +11,7 @@ use crate::{
     keys::service::KeyService,
     messages::{messaging_service::MessagingService, sender_service::MessageSenderService},
     notifications::{gateway::apns::ApnsNotificationGateway, service::NotificationService},
+    presence::{service::PresenceService, update_service::PresenceUpdateService},
     profiles::service::ProfileService,
     registration::service::RegistrationService,
     settings::{AssetsDatabaseSettings, CoreDatabaseSettings, EphemeralDatabaseSettings, Settings},
@@ -27,6 +28,7 @@ pub struct AppContext {
         SqliteDatabase,
         ApnsNotificationGateway,
     >,
+    pub presence_service: PresenceService<WebSocketCenter>,
     pub profile_service: ProfileService<SqliteDatabase, S3Storage>,
     pub registration_service: RegistrationService<PrismHttpClient, SqliteDatabase, SqliteDatabase>,
     pub websocket_center: Arc<WebSocketCenter>,
@@ -119,9 +121,17 @@ pub async fn start_application(settings: &Settings) -> Result<AppContext> {
     );
     let message_sender_service_arc = Arc::new(message_sender_service);
 
+    let presence_service = PresenceService::new(websocket_center_arc.clone());
+    let presence_update_service = PresenceUpdateService::new(websocket_center_arc.clone());
+    let presence_update_service_arc = Arc::new(presence_update_service);
+
     let profile_service = ProfileService::new(core_db.clone(), assets_db.clone());
 
     message_sender_service_arc.spawn_message_sender();
+    presence_update_service_arc
+        .clone()
+        .handle_presence_updates()
+        .await;
 
     register_messenger_service(prism_arc.clone(), &signing_key).await?;
 
@@ -131,6 +141,7 @@ pub async fn start_application(settings: &Settings) -> Result<AppContext> {
         registration_service,
         key_service,
         messaging_service,
+        presence_service,
         profile_service,
         websocket_center: websocket_center_arc,
     })
