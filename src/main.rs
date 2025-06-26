@@ -4,7 +4,7 @@ mod database;
 mod keys;
 mod messages;
 mod notifications;
-
+mod presence;
 mod profiles;
 mod registration;
 mod settings;
