@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     account::{auth::middleware::require_auth, entities::Account},
-    context::AppContext,
+    startup::AppContext,
 };
 
 const PROFILES_TAG: &str = "profiles";

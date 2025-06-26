@@ -6,10 +6,10 @@ use axum::{
     response::IntoResponse,
 };
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, trace};
 
 use super::header::AuthHeader;
-use crate::context::AppContext;
+use crate::startup::AppContext;
 
 // Basic Auth middleware
 pub async fn require_auth(
@@ -45,6 +45,7 @@ pub async fn require_auth(
 
     request.extensions_mut().insert(authenticated_account);
 
+    trace!("Authenticated user: {}", auth_header.username);
     // Pass the request to the next handler
     Ok(next.run(request).await)
 }
