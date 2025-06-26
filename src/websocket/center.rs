@@ -9,7 +9,12 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
-    messages::{entities::Message, error::MessagingError, gateway::MessageGateway},
+    messages::{
+        entities::Message,
+        error::MessagingError,
+        gateway::MessageGateway,
+        typing::gateway::{TypingGateway, TypingGatewayError, TypingStatus},
+    },
     presence::{
         database::PresenceDatabase,
         entities::PresenceStatus,
@@ -359,6 +364,74 @@ impl From<WebSocketError> for PresenceError {
             WebSocketError::SerializationFailed(msg) | WebSocketError::SendingFailed(msg) => {
                 PresenceError::SendingFailed(msg)
             }
+        }
+    }
+}
+
+// Typing
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TypingWebSocketMessage {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub account_id: Uuid,
+    pub is_typing: bool,
+}
+
+impl TypingWebSocketMessage {
+    pub fn new(account_id: Uuid, is_typing: bool) -> Self {
+        Self {
+            message_type: "typing".to_string(),
+            account_id,
+            is_typing,
+        }
+    }
+}
+
+#[async_trait]
+impl TypingGateway for WebSocketCenter {
+    async fn send_typing_update(
+        &self,
+        typing_status: &TypingStatus,
+    ) -> Result<(), TypingGatewayError> {
+        let ws_message =
+            TypingWebSocketMessage::new(typing_status.sender_id, typing_status.is_typing);
+        self.send_to_account(typing_status.recipient_id, &ws_message)
+            .await?;
+        Ok(())
+    }
+
+    async fn register_typing_handler<H>(&self, handler: H)
+    where
+        H: Fn(TypingStatus) + Send + Sync + 'static,
+    {
+        self.register_handler(
+            "typing",
+            move |sender_id, typing_message: TypingWebSocketMessage| {
+                let typing_status = TypingStatus {
+                    sender_id,
+                    recipient_id: typing_message.account_id,
+                    is_typing: typing_message.is_typing,
+                };
+                handler(typing_status);
+                Ok(())
+            },
+        )
+        .await;
+    }
+}
+
+impl From<WebSocketError> for TypingGatewayError {
+    fn from(err: WebSocketError) -> Self {
+        match err {
+            WebSocketError::ConnectionNotFound(account_id) => {
+                TypingGatewayError::RecipientNotConnected(account_id)
+            }
+            WebSocketError::SerializationFailed(msg) => {
+                TypingGatewayError::InvalidMessageFormat(msg)
+            }
+            WebSocketError::SendingFailed(msg) => TypingGatewayError::SendingFailed(msg),
         }
     }
 }
