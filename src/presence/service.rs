@@ -46,7 +46,7 @@ mod tests {
         let result = service.get_presence_status(&account_id).await;
 
         assert!(result.is_ok());
-        matches!(result.unwrap(), PresenceStatus::Online);
+        assert!(matches!(result.unwrap(), PresenceStatus::Online));
     }
 
     #[tokio::test]
@@ -64,7 +64,7 @@ mod tests {
         let result = service.get_presence_status(&account_id).await;
 
         assert!(result.is_ok());
-        matches!(result.unwrap(), PresenceStatus::Offline);
+        assert!(matches!(result.unwrap(), PresenceStatus::Offline));
     }
 
     #[tokio::test]
@@ -82,6 +82,6 @@ mod tests {
         let result = service.get_presence_status(&account_id).await;
 
         assert!(result.is_err());
-        matches!(result.unwrap_err(), PresenceError::Database(_));
+        assert!(matches!(result.unwrap_err(), PresenceError::Database(_)));
     }
 }
