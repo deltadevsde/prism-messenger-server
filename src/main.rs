@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Initialize telemetry
-    let attributes: Vec<(String, String)> = vec![("labvel".to_string(), "value".to_string())];
+    let attributes: Vec<(String, String)> = vec![("label".to_string(), "value".to_string())];
     let (meter_provider, log_provider) = init(telemetry_config.clone(), attributes)?;
 
     if let Some(metrics) = get_metrics() {
