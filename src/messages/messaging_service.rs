@@ -671,7 +671,7 @@ mod tests {
 
         let message = create_test_message();
 
-        // Should still succeed even if notification fails
+        // Should fail when notification fails
         let result = service.send_message(bob_id, alice_id, message).await;
         assert!(result.is_err()); // Should fail due to notification error
         assert!(matches!(
