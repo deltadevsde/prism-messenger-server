@@ -20,6 +20,7 @@ use settings::Settings;
 use startup::start_application;
 use std::error::Error;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::spawn;
 use tracing::{debug, error, info};
 
@@ -27,6 +28,7 @@ use crate::telemetry::init::init;
 use crate::telemetry::metrics_registry::get_metrics;
 
 pub static PRISM_MESSENGER_SERVICE_ID: &str = "prism_messenger";
+pub static MESSAGE_SENDER_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Command line arguments for the Prism Messenger Server
 #[derive(Parser, Debug)]

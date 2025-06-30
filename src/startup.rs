@@ -1,9 +1,9 @@
 use anyhow::{Result, bail};
 use prism_client::{PendingTransaction, PrismApi, PrismHttpClient, SigningKey};
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc};
 
 use crate::{
-    PRISM_MESSENGER_SERVICE_ID,
+    MESSAGE_SENDER_POLL_INTERVAL, PRISM_MESSENGER_SERVICE_ID,
     account::{auth::service::AuthService, service::AccountService},
     database::{
         inmemory::InMemoryDatabase, pool::create_sqlite_pool, s3::S3Storage, sqlite::SqliteDatabase,
@@ -114,10 +114,11 @@ pub async fn start_application(settings: &Settings) -> Result<AppContext> {
         websocket_center_arc.clone(),
         notification_service_arc.clone(),
     );
+
     let message_sender_service = MessageSenderService::new(
         ephemeral_db.clone(),
         websocket_center_arc.clone(),
-        Duration::from_secs(2),
+        MESSAGE_SENDER_POLL_INTERVAL,
     );
     let message_sender_service_arc = Arc::new(message_sender_service);
 
