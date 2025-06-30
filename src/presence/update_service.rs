@@ -51,10 +51,12 @@ where
                 .register_presence_handler(move |presence_update| {
                     let gateway = gateway.clone();
                     tokio::spawn(async move {
-                        gateway
-                            .send_presence_update(&presence_update)
-                            .await
-                            .unwrap();
+                        if let Err(e) = gateway.send_presence_update(&presence_update).await {
+                            tracing::error!(
+                                error = %e,
+                                "Failed to send presence update"
+                            );
+                        }
                     });
                 })
                 .await;
