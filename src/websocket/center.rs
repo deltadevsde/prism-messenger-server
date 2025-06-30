@@ -109,13 +109,16 @@ impl WebSocketCenter {
     where
         T: Serialize + Send + Sync,
     {
-        let connections = self.connections.read().await;
-        for connection in connections.values() {
-            if let Err(e) = self.send_to_account(connection.account_id, message).await {
-                warn!(
-                    "Failed to broadcast message to {}: {}",
-                    connection.account_id, e
-                );
+        // Collect account IDs while holding the read lock
+        let account_ids: Vec<Uuid> = {
+            let connections = self.connections.read().await;
+            connections.values().map(|conn| conn.account_id).collect()
+        };
+
+        // Send messages without holding the lock
+        for account_id in account_ids {
+            if let Err(e) = self.send_to_account(account_id, message).await {
+                warn!("Failed to broadcast message to {}: {}", account_id, e);
             }
         }
         Ok(())
@@ -178,10 +181,13 @@ impl WebSocketCenter {
 
     /// Remove a WebSocket connection for an account
     pub async fn remove_connection(&self, account_id: &Uuid) {
-        let mut connections = self.connections.write().await;
-        connections.remove(account_id);
+        // Remove connection while holding write lock
+        {
+            let mut connections = self.connections.write().await;
+            connections.remove(account_id);
+        }
 
-        // Notify disconnect handlers
+        // Notify disconnect handlers after releasing the write lock
         let handlers = self.disconnect_handlers.read().await;
         for handler in handlers.iter() {
             if let Err(e) = handler(*account_id) {
