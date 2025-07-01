@@ -13,7 +13,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
 use crate::account::entities::Account;
-use crate::context::AppContext;
+use crate::startup::AppContext;
 
 use super::auth::middleware::require_auth;
 

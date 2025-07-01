@@ -10,8 +10,8 @@ use uuid::Uuid;
 use super::entities::DoubleRatchetMessage;
 use crate::{
     account::{auth::middleware::require_auth, entities::Account},
-    context::AppContext,
     messages::entities::{Message, MessageReceipt},
+    startup::AppContext,
 };
 
 const MESSAGING_TAG: &str = "messaging";
@@ -64,7 +64,7 @@ async fn send_message(
 
 #[utoipa::path(
     get,
-    path = "/get",
+    path = "/pending",
     responses(
         (status = 200, description = "Messages fetched successfully", body = Vec<Message>),
         (status = 400, description = "Bad rquest"),
@@ -78,7 +78,7 @@ async fn fetch_messages(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     context
         .messaging_service
-        .get_messages(account.id)
+        .get_pending_messages(account.id)
         .await
         .map(Json)
 }

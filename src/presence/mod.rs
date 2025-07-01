@@ -2,9 +2,8 @@ pub mod database;
 pub mod entities;
 pub mod error;
 pub mod gateway;
-pub mod messaging_service;
-pub mod sender_service;
-
 mod router;
+pub mod service;
+pub mod update_service;
 
 pub use router::router;

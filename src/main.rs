@@ -1,30 +1,34 @@
 mod account;
-mod context;
 mod crypto;
 mod database;
-mod initialization;
 mod keys;
 mod messages;
 mod notifications;
+mod presence;
 mod profiles;
 mod registration;
 mod settings;
-mod webserver;
+mod startup;
 mod telemetry;
+mod webserver;
+mod websocket;
 
 use anyhow::Result;
 use clap::Parser;
-use context::AppContext;
+use prism_telemetry::telemetry::shutdown_telemetry;
 use settings::Settings;
+use startup::start_application;
 use std::error::Error;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::spawn;
-use tracing::{debug, info, error};
-use prism_telemetry::telemetry::shutdown_telemetry;
-use crate::telemetry::metrics_registry::get_metrics;
+use tracing::{debug, error, info};
+
 use crate::telemetry::init::init;
+use crate::telemetry::metrics_registry::get_metrics;
 
 pub static PRISM_MESSENGER_SERVICE_ID: &str = "prism_messenger";
+pub static MESSAGE_SENDER_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Command line arguments for the Prism Messenger Server
 #[derive(Parser, Debug)]
@@ -37,7 +41,6 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-
     let cli = Cli::parse();
 
     // Load settings with optional custom config path
@@ -54,29 +57,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Initialize telemetry
-    let attributes: Vec<(String, String)> = vec![
-        ("labvel".to_string(), "value".to_string()),
-    ];
-    let (meter_provider, log_provider) = init(
-        telemetry_config.clone(),
-        attributes,
-    )?;
+    let attributes: Vec<(String, String)> = vec![("label".to_string(), "value".to_string())];
+    let (meter_provider, log_provider) = init(telemetry_config.clone(), attributes)?;
 
     if let Some(metrics) = get_metrics() {
-        metrics.record_node_info(
-            vec![
-                ("version".to_string(), env!("CARGO_PKG_VERSION").to_string()),
-                ("prism_host".to_string(), settings.prism.host.to_string() + ":" + &settings.prism.port.to_string()),
-            ]
-        );
+        metrics.record_node_info(vec![
+            ("version".to_string(), env!("CARGO_PKG_VERSION").to_string()),
+            (
+                "prism_host".to_string(),
+                settings.prism.host.to_string() + ":" + &settings.prism.port.to_string(),
+            ),
+        ]);
     }
 
-    let context = AppContext::from_settings(&settings).await?;
-
-    context
-        .initialization_service
-        .initialize_messenger_server()
-        .await?;
+    let context = start_application(&settings).await?;
 
     let webserver_task_handle = spawn(async move {
         debug!("starting webserver");

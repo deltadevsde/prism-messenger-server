@@ -10,7 +10,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
 use super::entities::RegistrationChallenge;
-use crate::context::AppContext;
+use crate::startup::AppContext;
 
 const REGISTRATION_TAG: &str = "registration";
 
@@ -102,7 +102,6 @@ async fn post_finalize_registration(
     State(context): State<Arc<AppContext>>,
     Json(req): Json<FinalizeRegistrationRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-
     context
         .registration_service
         .finalize_registration(

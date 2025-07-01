@@ -15,6 +15,6 @@ pub enum NotificationError {
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
-pub trait NotificationGateway {
+pub trait NotificationGateway: Send + Sync {
     async fn send_silent_notification(&self, device_token: &[u8]) -> Result<(), NotificationError>;
 }
