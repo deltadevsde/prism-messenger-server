@@ -28,7 +28,9 @@ where
                 );
                 let gateway = gateway.clone();
                 tokio::spawn(async move {
-                    let _ = gateway.send_typing_update(&typing_status).await;
+                    if let Err(e) = gateway.send_typing_update(&typing_status).await {
+                        tracing::error!("Failed to send typing update: {:?}", e);
+                    }
                 });
             })
             .await;
